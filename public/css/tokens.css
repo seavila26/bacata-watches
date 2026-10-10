@@ -1,0 +1,38 @@
+@font-face { font-family: Caladea; src: url('/assets/fonts/Caladea-Regular.woff') format('woff'); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: Caladea; src: url('/assets/fonts/Caladea-Italic.woff') format('woff'); font-style: italic; font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Noto Sans'; src: url('/assets/fonts/NotoSans-Regular.woff') format('woff'); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Noto Sans'; src: url('/assets/fonts/NotoSans-Bold.woff') format('woff'); font-style: normal; font-weight: 500 700; font-display: swap; }
+
+/* Brand book 2.0, pages 11–13 and 26. Single source for design decisions. */
+:root {
+  --blue: #0B1D3A;
+  --ivory: #F7F3EB;
+  --white: #FFFFFF;
+  --black: #0A0A0A;
+  --brass: #A4864C; /* Decorative accents only; never small text on white. */
+  --gray: #62666D;
+  --line: #D9DDE3;
+  --success: #286143;
+  --error: #A32929;
+  --warning: #725015;
+  --bg: var(--white);
+  --surface: var(--white);
+  --text: var(--black);
+  --muted: var(--gray);
+  --gold: var(--blue);
+  --good: var(--success);
+  --bad: var(--error);
+  --serif: Caladea, Georgia, serif;
+  --sans: 'Noto Sans', Arial, sans-serif;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+  --space-7: 64px;
+  --space-8: 96px;
+  --content-width: 1200px;
+  --shadow: 0 16px 48px rgb(11 29 58 / 8%);
+  --transition: 180ms ease;
+}

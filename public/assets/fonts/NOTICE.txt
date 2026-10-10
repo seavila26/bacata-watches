@@ -1,0 +1,3 @@
+Caladea: Copyright (c) 2012 Huerta Tipografia. Apache License 2.0.
+Noto Sans: Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic). SIL Open Font License 1.1.
+Fonts retain their original names and metadata; WOFF is a lossless web packaging format.

@@ -1,0 +1,20 @@
+{
+  "name": "aurel-watches",
+  "version": "0.5.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=.env --watch src/server.js",
+    "start": "node --env-file=.env src/server.js",
+    "test": "node --test tests/*.test.js",
+    "test:inventory": "node scripts/verify-inventory.js",
+    "test:pilot": "node scripts/pilot-candidates.js"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "exceljs": "^4.4.0"
+  }
+}

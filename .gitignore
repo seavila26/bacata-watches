@@ -1,0 +1,26 @@
+data/*.sqlite
+data/*.sqlite-*
+.env
+node_modules/
+
+# Credenciales
+.env
+.env.*
+!.env.example
+
+# Datos locales e inventarios
+data/
+*.sqlite*
+*.db
+*.xlsx
+*.xls
+*.csv
+
+# Archivos cargados y dependencias
+public/uploads/
+node_modules/
+
+# Archivos temporales
+*.log
+*.zip
+backups/
