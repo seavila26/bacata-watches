@@ -100,3 +100,52 @@ npm run test:pilot -- "ruta\al\inventario.xlsx" --live
 ```
 
 El chequeo visual en navegador sigue pendiente. Se comprobó la estructura de los formularios y tablas mediante DOM, pero no se presentan nuevas capturas de escritorio/móvil. La pasarela de pagos y las reservas siguen pendientes como en v0.4.
+
+## Actualización: lectura renderizada opcional
+
+El HTML inicial de Bulova 98B428 se obtuvo con HTTP 200, título y referencia, pero sin h1, Product JSON-LD ni especificaciones. Ahora se distingue una ficha que requiere JavaScript de una referencia incorrecta o un bloqueo. El título por sí solo nunca acredita características.
+
+Para una fuente cuya consulta automatizada esté autorizada, instala y activa:
+
+```powershell
+npm ci
+npm run browser:install
+```
+
+Añade a tu `.env` existente `ENRICHMENT_RENDER_ENABLED=true` y reinicia con `npm start`. No reemplaces tu `.env`. Por defecto está desactivado.
+
+El navegador se utiliza solo cuando se detecta la estructura inicial sin ficha. Se cierra después de cada pieza. Usa HTTPS con dominios permitidos y DNS público validado, limita solicitudes, tamaño y tiempo, bloquea conexiones WebSocket, service workers, imágenes y peticiones distintas de GET. No inicia sesión ni resuelve verificaciones humanas. Fuentes que dependan de POST, cookies, dominios adicionales o estructuras incompatibles pueden seguir pendientes: utiliza entonces el catálogo autorizado. No se garantiza la extracción de Jomashop.
+
+No basta con encontrar el título: la lectura renderizada exige referencia/marca válidas y al menos una especificación explícita. Cada característica registra el método `rendered/html` o `rendered/structured/html`. La revisión, aprobación y publicación siguen separadas.
+
+Los lotes terminados conservan sus resultados anteriores. Selecciona las diez piezas y crea un nuevo piloto para obtener los nuevos diagnósticos. No ejecutes los 149 hasta revisar las propuestas de ese piloto.
+
+Validación: 19 pruebas aprobadas, incluida una prueba con Chromium real y una ficha controlada que incorpora especificaciones mediante JavaScript. Se comprobó el bloqueo de otro dominio y de POST. La extracción real de las diez páginas de Jomashop permanece pendiente de validación desde la instalación con acceso autorizado.
+
+## Diagnóstico y adaptador verificados para 98B428 (10 de octubre de 2026)
+
+Se observó la página real en Chromium utilizando el transporte disponible en el entorno de desarrollo. HTML inicial: HTTP 200, 80.576 bytes, sin ficha. Se cargaron scripts del dominio principal y ocho respuestas GET de `/graphql`; una respuesta contenía `productDetail`. El POST `registerProductView` se mantuvo bloqueado. No se habilitaron métodos ni dominios adicionales.
+
+La ficha renderizada sí acreditaba Bulova y 98B428 en JSON-LD, h1 y especificaciones principales. El fallo del extractor era su falta de soporte para `.more-detail-body .more-detail-content`, con `.more-label` y `.more-value`. Ahora se lee ese componente únicamente cuando existe un bloque principal y su modelo/marca coinciden exactamente. Se añadió el alias `Collection Name`.
+
+Resultado de extracción desde el HTML real: Racer, Cuarzo, 42 mm, IP Stainless Steel (texto original conservado), Leather (texto original conservado), esfera negra, correa negra, zafiro resistente a rayones, 100 metros / 330 pies y una URL de imagen de producto. No se dedujo color de caja, stock, precio ni condiciones comerciales. La integración con Chromium también pasó usando las respuestas reales capturadas, sin nuevas consultas de datos. Esto valida esta referencia y esta estructura, no las restantes 148 ni la disponibilidad comercial.
+
+El lector de producción con DNS validado encontró `EAI_AGAIN` desde este entorno. Para obtener evidencia del transporte real de la instalación del usuario, ejecutar una sola referencia:
+
+```powershell
+npm run diagnose:source -- "https://www.jomashop.com/bulova-racer-chronograph-quartz-black-dial-mens-watch-98b428.html" "98B428" "Bulova"
+```
+
+Este comando activa la lectura renderizada para el diagnóstico y usa el mismo lector HTTPS de producción. Necesita Chromium instalado. No modifica SQLite ni descarga fotos ni publica. Genera `source-diagnostic.json` (excluido de Git), con etapas, solicitudes GET/POST observadas, rutas sin query/cookies/credenciales, códigos de respuesta, fallos y errores de JavaScript. Una ficha extraída produce `state: extracted`; un pendiente sale con código 2 y motivo. Las solicitudes bloqueadas no se presentan como causa demostrada del fallo: el informe lista observaciones.
+
+El panel ahora distingue el fallo posterior a la ejecución de Chromium del HTML inicial. En caso de pendiente muestra un resumen de las solicitudes fallidas y conserva el historial de lotes. El informe de diagnóstico incluye el listado completo hasta 160 entradas.
+
+Validación final: 21 pruebas aprobadas, incluidas Chromium real, diagnóstico sin query/credenciales, estructura observada y rechazo de un modelo diferente o de especificaciones relacionadas. Antes de producción falta validar el transporte de la instalación, el resto del piloto y las condiciones de acceso/uso de las fuentes.
+
+## Resultado desde la instalación del usuario: HTTP 493
+
+El diagnóstico de 98B428 del 10 de octubre, 19:12:18 UTC, obtuvo HTML inicial y scripts con HTTP 200, pero cinco GET a `www.jomashop.com/graphql` fallaron con HTTP 493. También se observaron solicitudes del flujo `/cdn-cgi/challenge-platform/`. No se obtuvo una ficha en esa instalación. El código HTTP no estándar y el flujo observado no permiten determinar por sí solos la causa o política exacta del rechazo.
+
+El resumen del panel prioriza ahora ese fallo de datos sobre los scripts externos bloqueados y utiliza `SOURCE_DATA_HTTP_ERROR`. Se conserva el HTTP numérico en cada solicitud fallida. Las rutas variables de verificación se ocultan en el diagnóstico. No se habilitan POST ni verificaciones automáticas ni se reintenta masivamente la fuente.
+
+La extracción de la estructura de ficha continúa validada, pero el acceso directo de esta instalación no constituye todavía una fuente fiable para la automatización de producción. La alternativa existente es cargar el catálogo JSON autorizado en Preparar catálogo, manteniendo revisión y publicación separadas. La sincronización recurrente requiere una fuente de datos con acceso estable y acordado; la prueba no demuestra que exista esa integración con Jomashop.

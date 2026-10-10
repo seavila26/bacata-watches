@@ -4,6 +4,7 @@ import {db,audit} from './db.js';
 import {selectedProducts} from './catalog-bulk.js';
 import {editProduct,planEditProduct} from './product-editor.js';
 import {readSource,extractProduct,sourceUrl,translate} from './source-reader.js';
+import {readProductSource} from './product-source.js';
 import {identityKey} from './catalog-model.js';
 import {spanishCopy} from './spanish-copy.js';
 const facts=['collection','movement','diameter_mm','material','crystal','water_resistance','dial_color','case_color','strap_color','strap'];
@@ -76,8 +77,7 @@ async function runJob(id,options) {
     try {
       const p=JSON.parse(item.before_json);
       if(!p.supplier_url)throw Error('Falta URL del proveedor');
-      const response=await readSource(p.supplier_url);
-      const extracted=extractProduct(response.buffer.toString('utf8'),p,response.url);extracted.url=response.url;
+      const extracted=await readProductSource(p.supplier_url,p);
       const proposal=await prepareProposal(p,extracted,options);
       db.prepare("UPDATE enrichment_items SET state='proposed',proposal_json=?,error=NULL,updated_at=? WHERE id=?").run(JSON.stringify(proposal),new Date().toISOString(),item.id);
     }catch(e){db.prepare("UPDATE enrichment_items SET state='failed',error=?,updated_at=? WHERE id=?").run(e.message.slice(0,1000),new Date().toISOString(),item.id);}

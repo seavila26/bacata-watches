@@ -24,3 +24,6 @@ node_modules/
 *.log
 *.zip
 backups/
+
+# Diagnósticos locales
+source-diagnostic.json

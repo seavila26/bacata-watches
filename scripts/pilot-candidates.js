@@ -16,7 +16,7 @@ try {
   const results=[];
   for(const r of selected) {
     const row={brand:r.brand,reference:r.reference,source_url:r.source.supplier_url};
-    if(live)try{const response=await readSource(row.source_url,{timeoutMs:3000});const data=extractProduct(response.buffer.toString('utf8'),row,response.url);row.state='extracted';row.fields=data.fields;row.images=data.images;row.warnings=data.warnings;}catch(e){row.state='pending_source';row.reason=e.message;}
+    if(live)try{const data=await readProductSource(row.source_url,row);row.state='extracted';row.fields=data.fields;row.images=data.images;row.warnings=data.warnings;}catch(e){row.state='pending_source';row.reason=e.message;}
     else row.state='not_requested';
     results.push(row);
   }
