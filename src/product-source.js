@@ -3,10 +3,18 @@ import {readSource,extractProduct,sourceUrl} from './source-reader.js';
 // All browser requests use the existing DNS-pinned HTTPS reader. No browser
 // network fallback, arbitrary hosts, cookies, logins, or challenge solving.
 export function requestLabel(raw) {
-  try {const url=new URL(raw);return `${url.hostname}${url.pathname}`.slice(0,240);}catch{return 'URL no válida';}
+  try {const url=new URL(raw);const path=url.pathname.includes('/cdn-cgi/challenge-platform/')?'/cdn-cgi/challenge-platform/[ruta omitida]':url.pathname;return `${url.hostname}${path}`.slice(0,240);}catch{return 'URL no válida';}
 }
 export function renderFailure(error,diagnostics) {
   const failures=diagnostics.requests.filter(r=>['blocked_method','blocked_host','read_failed','request_limit','size_limit'].includes(r.outcome));
+  const dataRejection=failures.find(r=>r.outcome==='read_failed'&&/^www\.jomashop\.com\/graphql$/.test(r.target)&&(r.status||/HTTP\s+\d{3}/.test(r.reason||'')));
+  if(dataRejection) {
+    const status=dataRejection.status||Number(dataRejection.reason.match(/HTTP\s+(\d{3})/)[1]);
+    const challenge=diagnostics.requests.some(r=>r.target.includes('/cdn-cgi/challenge-platform/'));
+    const result=Error(`El proveedor rechazó la consulta de datos del producto: ${dataRejection.method} ${dataRejection.target}, HTTP ${status}. La página inicial cargó, pero no se pudo obtener la ficha.${challenge?' También se observó un flujo de verificación del sitio.':''} Requiere revisar el acceso autorizado a la fuente; no es una referencia incorrecta.`);
+    result.code='SOURCE_DATA_HTTP_ERROR';result.status=status;result.diagnostics=diagnostics;return result;
+  }
+  failures.sort((a,b)=>Number(b.outcome==='read_failed')-Number(a.outcome==='read_failed'));
   const unique=[...new Set(failures.map(r=>`${r.method} ${r.target}: ${r.reason||r.outcome}`))].slice(0,4);
   const detail=unique.length?` Solicitudes fallidas registradas: ${unique.join('; ')}.`:' No se registraron solicitudes bloqueadas de datos o scripts.';
   const result=Error(`La lectura con Chromium no produjo una ficha verificable. ${error.message}.${detail}`);
@@ -39,7 +47,7 @@ export async function renderProduct(raw,expected,{reader=readSource,chromium,lau
         bytes+=response.buffer.length;if(bytes>32*1024*1024){record({...entry,outcome:'size_limit',reason:'Límite total de 32 MB'});return await route.abort();}
         record({...entry,outcome:'fulfilled',status:response.status,bytes:response.buffer.length});
         await route.fulfill({status:response.status,body:response.buffer,headers:{'content-type':String(response.headers['content-type']||'application/octet-stream')}});
-      }catch(error){record({...entry,outcome:'read_failed',reason:String(error.code||error.message||'Error de lectura').replace(/https?:\/\/[^\s]+/g,'[URL omitida]').slice(0,180)});await route.abort().catch(()=>{});}
+      }catch(error){record({...entry,outcome:'read_failed',...(error.status?{status:error.status}:{}),...(error.code?{code:error.code}:{}),reason:String(error.message||'Error de lectura').replace(/https?:\/\/[^\s]+/g,'[URL omitida]').slice(0,180)});await route.abort().catch(()=>{});}
     });
     const page=await context.newPage();
     diagnostics.script_errors=[];

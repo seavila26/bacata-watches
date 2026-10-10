@@ -21,9 +21,18 @@ test('rendering is opt-in and happens only for a JavaScript shell',async()=>{
 });
 test('diagnostics remove credentials and query values, and distinguish rendering failure',()=>{
   assert.equal(requestLabel('https://user:password@www.jomashop.com/graphql?token=secret'),'www.jomashop.com/graphql');
+  assert.equal(requestLabel('https://www.jomashop.com/cdn-cgi/challenge-platform/token/value'),'www.jomashop.com/cdn-cgi/challenge-platform/[ruta omitida]');
   const diagnostics={requests:[{method:'POST',target:'www.jomashop.com/graphql',outcome:'blocked_method',reason:'Método no permitido'}],stages:[]};
   const error=renderFailure(Error('La ficha requiere JavaScript'),diagnostics);
   assert.equal(error.code,'SOURCE_RENDER_INCOMPLETE');assert.match(error.message,/Chromium/);assert.match(error.message,/POST www.jomashop.com\/graphql/);assert.equal(error.diagnostics,diagnostics);
+});
+test('product-data HTTP rejection takes priority over unrelated blocked scripts',()=>{
+  const requests=[{method:'GET',target:'ads.example/script.js',outcome:'blocked_host',reason:'No permitido'},
+    {method:'GET',target:'www.jomashop.com/graphql',resource:'fetch',outcome:'read_failed',reason:'Fuente HTTP 493; no se obtuvo la ficha'},
+    {method:'POST',target:'www.jomashop.com/cdn-cgi/challenge-platform/verify',outcome:'blocked_method'}];
+  const error=renderFailure(Error('La ficha requiere JavaScript'),{requests,stages:[]});
+  assert.equal(error.code,'SOURCE_DATA_HTTP_ERROR');assert.equal(error.status,493);assert.match(error.message,/GET www.jomashop.com\/graphql, HTTP 493/);assert.match(error.message,/flujo de verificación/);assert.doesNotMatch(error.message,/ads.example/);
+  const typed=renderFailure(Error('No data'),{requests:[{method:'GET',target:'www.jomashop.com/graphql',outcome:'read_failed',status:429,reason:'HTTP error'}],stages:[]});assert.equal(typed.status,429);assert.doesNotMatch(typed.message,/verificación/);
 });
 test('rendered source validates identity and records evidence; outside hosts never reach reader',{skip:!process.env.BACATA_TEST_CHROMIUM},async()=>{
   const calls=[];

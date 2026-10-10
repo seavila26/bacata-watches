@@ -27,7 +27,7 @@ export async function readSource(raw,{maxBytes=4*1024*1024,redirects=0,timeoutMs
     });req.setTimeout(timeoutMs,()=>req.destroy(Error('Tiempo de espera de la fuente agotado')));req.on('error',reject);
   });
   if(response.status>=300&&response.status<400&&response.headers.location)return readSource(new URL(response.headers.location,u).href,{maxBytes,redirects:redirects+1,timeoutMs});
-  if(response.status!==200)throw Error(`Fuente HTTP ${response.status}; no se obtuvo la ficha`);
+  if(response.status!==200){const error=Error(`Fuente HTTP ${response.status}; no se obtuvo la ficha`);error.code='SOURCE_HTTP_ERROR';error.status=response.status;throw error;}
   return response;
 }
 const clean=v=>String(v??'').replace(/\s+/g,' ').trim();

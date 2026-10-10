@@ -1,3 +1,9 @@
+## Diagnóstico de rechazo del endpoint de producto
+
+- HTTP 493 observado en `/graphql` desde la instalación del usuario: se muestra antes que los bloqueos de scripts externos.
+- Código `SOURCE_DATA_HTTP_ERROR`, estado HTTP persistido en diagnóstico y rutas de verificación ocultas.
+- Prueba de regresión del informe recibido.
+
 ## Adaptador y diagnóstico de una referencia real
 
 - Soporte de especificaciones Jomashop observado en Bulova 98B428, con comprobación de modelo/marca del bloque principal.

@@ -141,3 +141,11 @@ Este comando activa la lectura renderizada para el diagnóstico y usa el mismo l
 El panel ahora distingue el fallo posterior a la ejecución de Chromium del HTML inicial. En caso de pendiente muestra un resumen de las solicitudes fallidas y conserva el historial de lotes. El informe de diagnóstico incluye el listado completo hasta 160 entradas.
 
 Validación final: 21 pruebas aprobadas, incluidas Chromium real, diagnóstico sin query/credenciales, estructura observada y rechazo de un modelo diferente o de especificaciones relacionadas. Antes de producción falta validar el transporte de la instalación, el resto del piloto y las condiciones de acceso/uso de las fuentes.
+
+## Resultado desde la instalación del usuario: HTTP 493
+
+El diagnóstico de 98B428 del 10 de octubre, 19:12:18 UTC, obtuvo HTML inicial y scripts con HTTP 200, pero cinco GET a `www.jomashop.com/graphql` fallaron con HTTP 493. También se observaron solicitudes del flujo `/cdn-cgi/challenge-platform/`. No se obtuvo una ficha en esa instalación. El código HTTP no estándar y el flujo observado no permiten determinar por sí solos la causa o política exacta del rechazo.
+
+El resumen del panel prioriza ahora ese fallo de datos sobre los scripts externos bloqueados y utiliza `SOURCE_DATA_HTTP_ERROR`. Se conserva el HTTP numérico en cada solicitud fallida. Las rutas variables de verificación se ocultan en el diagnóstico. No se habilitan POST ni verificaciones automáticas ni se reintenta masivamente la fuente.
+
+La extracción de la estructura de ficha continúa validada, pero el acceso directo de esta instalación no constituye todavía una fuente fiable para la automatización de producción. La alternativa existente es cargar el catálogo JSON autorizado en Preparar catálogo, manteniendo revisión y publicación separadas. La sincronización recurrente requiere una fuente de datos con acceso estable y acordado; la prueba no demuestra que exista esa integración con Jomashop.
