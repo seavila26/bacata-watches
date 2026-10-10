@@ -35,7 +35,7 @@ const canonical=v=>clean(v).toUpperCase().replace(/[^A-Z0-9]/g,'');
 const norm=v=>clean(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
 const translations=new Map(Object.entries({'automatic':'Automático','swiss automatic':'Automático suizo','japanese automatic':'Automático japonés','swiss quartz':'Cuarzo suizo','japanese quartz':'Cuarzo japonés','self winding':'Automático','quartz':'Cuarzo','hand wind':'Cuerda manual','manual winding':'Cuerda manual','stainless steel':'Acero inoxidable','titanium':'Titanio','sapphire':'Zafiro','sapphire crystal':'Zafiro','scratch resistant sapphire':'Zafiro resistente a rayones','mineral':'Mineral','mineral crystal':'Mineral','blue':'Azul','black':'Negro','white':'Blanco','green':'Verde','silver':'Plateado','gold':'Dorado','grey':'Gris','gray':'Gris','brown':'Marrón','red':'Rojo','pink':'Rosa','orange':'Naranja','mother of pearl':'Nácar'}));
 export const translate=v=>translations.get(clean(v).toLowerCase())||clean(v).replace(/\bmeters?\b/gi,'metros').replace(/\bfeet\b/gi,'pies');
-const mapping={collection:['series','collection','coleccion'],movement:['movement','movimiento'],diameter_mm:['case size','case diameter','diameter','diametro'],material:['case material','material de caja'],crystal:['crystal','cristal'],water_resistance:['water resistance','resistencia al agua'],dial_color:['dial color','color de esfera'],case_color:['case color','color de caja'],strap_color:['band color','strap color','color de correa'],strap:['band material','strap material','bracelet material','material de correa']};
+const mapping={collection:['series','collection','collection name','coleccion'],movement:['movement','movimiento'],diameter_mm:['case size','case diameter','diameter','diametro'],material:['case material','material de caja'],crystal:['crystal','cristal'],water_resistance:['water resistance','resistencia al agua'],dial_color:['dial color','color de esfera'],case_color:['case color','color de caja'],strap_color:['band color','strap color','color de correa'],strap:['band material','strap material','bracelet material','material de correa']};
 const aliases=new Map(Object.entries(mapping).flatMap(([key,labels])=>labels.map(label=>[norm(label),key])));
 function exactReference(v,reference) {
   return canonical(v)===canonical(reference);
@@ -72,6 +72,23 @@ export function extractProduct(html, expected, url) {
   if(brand&&norm(brand)!==norm(expected.brand))throw Error('La marca de la fuente no coincide');
   if(expected.condition==='Nuevo'&&/UsedCondition|RefurbishedCondition/i.test(String(product.itemCondition||'')))throw Error('La condición de la fuente no corresponde a una pieza nueva');
   const pairs=[];
+  // Observed Jomashop product-details component. Accept only one primary
+  // specification block whose own Model and Brand match the requested piece.
+  if(['www.jomashop.com','jomashop.com'].includes(new URL(url).hostname)) {
+    const bodies=$('.more-detail-body');
+    if(bodies.length===1) {
+      const rows=[];
+      bodies.find('.more-detail-content').each((_i,e)=>{
+        const labels=$(e).children('.more-label'),values=$(e).children('.more-value');
+        if(labels.length===1&&values.length===1)rows.push([clean(labels.text()),clean(values.text())]);
+      });
+      const models=rows.filter(([label])=>norm(label)==='model'),brands=rows.filter(([label])=>norm(label)==='brand');
+      if(models.length===1&&brands.length===1) {
+        if(!exactReference(models[0][1],expected.reference)||norm(brands[0][1])!==norm(expected.brand))throw Error('La referencia o marca del bloque principal de especificaciones no coincide');
+        pairs.push(...rows);
+      }
+    }
+  }
   for(const prop of product.additionalProperty||[])if(prop?.name&&prop?.value!=null)pairs.push([clean(prop.name),clean(prop.value)]);
   $('table tr').each((_i,e)=>{const cells=$(e).find('th,td');if(cells.length===2)pairs.push([clean($(cells[0]).text()),clean($(cells[1]).text())]);});
   $('dt').each((_i,e)=>{const dd=$(e).next('dd');if(dd.length)pairs.push([clean($(e).text()),clean(dd.text())]);});

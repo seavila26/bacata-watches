@@ -1,3 +1,9 @@
+## Adaptador y diagnóstico de una referencia real
+
+- Soporte de especificaciones Jomashop observado en Bulova 98B428, con comprobación de modelo/marca del bloque principal.
+- Informe de solicitudes y etapas; comando `npm run diagnose:source` sin modificar la base.
+- Extracción de HTML real y reproducción en Chromium con respuestas capturadas; 21 pruebas aprobadas.
+
 ## Lectura de fuentes con JavaScript
 
 - Diagnósticos específicos para HTML inicial, referencia incorrecta y bloqueo.

@@ -121,3 +121,23 @@ No basta con encontrar el título: la lectura renderizada exige referencia/marca
 Los lotes terminados conservan sus resultados anteriores. Selecciona las diez piezas y crea un nuevo piloto para obtener los nuevos diagnósticos. No ejecutes los 149 hasta revisar las propuestas de ese piloto.
 
 Validación: 19 pruebas aprobadas, incluida una prueba con Chromium real y una ficha controlada que incorpora especificaciones mediante JavaScript. Se comprobó el bloqueo de otro dominio y de POST. La extracción real de las diez páginas de Jomashop permanece pendiente de validación desde la instalación con acceso autorizado.
+
+## Diagnóstico y adaptador verificados para 98B428 (10 de octubre de 2026)
+
+Se observó la página real en Chromium utilizando el transporte disponible en el entorno de desarrollo. HTML inicial: HTTP 200, 80.576 bytes, sin ficha. Se cargaron scripts del dominio principal y ocho respuestas GET de `/graphql`; una respuesta contenía `productDetail`. El POST `registerProductView` se mantuvo bloqueado. No se habilitaron métodos ni dominios adicionales.
+
+La ficha renderizada sí acreditaba Bulova y 98B428 en JSON-LD, h1 y especificaciones principales. El fallo del extractor era su falta de soporte para `.more-detail-body .more-detail-content`, con `.more-label` y `.more-value`. Ahora se lee ese componente únicamente cuando existe un bloque principal y su modelo/marca coinciden exactamente. Se añadió el alias `Collection Name`.
+
+Resultado de extracción desde el HTML real: Racer, Cuarzo, 42 mm, IP Stainless Steel (texto original conservado), Leather (texto original conservado), esfera negra, correa negra, zafiro resistente a rayones, 100 metros / 330 pies y una URL de imagen de producto. No se dedujo color de caja, stock, precio ni condiciones comerciales. La integración con Chromium también pasó usando las respuestas reales capturadas, sin nuevas consultas de datos. Esto valida esta referencia y esta estructura, no las restantes 148 ni la disponibilidad comercial.
+
+El lector de producción con DNS validado encontró `EAI_AGAIN` desde este entorno. Para obtener evidencia del transporte real de la instalación del usuario, ejecutar una sola referencia:
+
+```powershell
+npm run diagnose:source -- "https://www.jomashop.com/bulova-racer-chronograph-quartz-black-dial-mens-watch-98b428.html" "98B428" "Bulova"
+```
+
+Este comando activa la lectura renderizada para el diagnóstico y usa el mismo lector HTTPS de producción. Necesita Chromium instalado. No modifica SQLite ni descarga fotos ni publica. Genera `source-diagnostic.json` (excluido de Git), con etapas, solicitudes GET/POST observadas, rutas sin query/cookies/credenciales, códigos de respuesta, fallos y errores de JavaScript. Una ficha extraída produce `state: extracted`; un pendiente sale con código 2 y motivo. Las solicitudes bloqueadas no se presentan como causa demostrada del fallo: el informe lista observaciones.
+
+El panel ahora distingue el fallo posterior a la ejecución de Chromium del HTML inicial. En caso de pendiente muestra un resumen de las solicitudes fallidas y conserva el historial de lotes. El informe de diagnóstico incluye el listado completo hasta 160 entradas.
+
+Validación final: 21 pruebas aprobadas, incluidas Chromium real, diagnóstico sin query/credenciales, estructura observada y rechazo de un modelo diferente o de especificaciones relacionadas. Antes de producción falta validar el transporte de la instalación, el resto del piloto y las condiciones de acceso/uso de las fuentes.
