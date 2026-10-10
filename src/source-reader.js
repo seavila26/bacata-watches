@@ -52,11 +52,20 @@ function productsIn(data) {
 }
 export function extractProduct(html, expected, url) {
   const $=load(html),structured=[];
+  const visible=clean($('body').clone().find('script,style,noscript').remove().end().text());
+  if(/verify (?:that )?you are human|checking your browser|access denied|captcha required|just a moment/i.test(visible)||/just a moment|access denied/i.test($('title').text())) {
+    const error=Error('La fuente presenta un bloqueo o verificación humana; no se intenta eludirlo');error.code='SOURCE_BLOCKED';throw error;
+  }
   $('script[type="application/ld+json"]').each((_i,e)=>{try{structured.push(...productsIn(JSON.parse($(e).text())));}catch{}});
   const match=structured.find(p=>exactReference(p.mpn,expected.reference)||exactReference(p.model,expected.reference)||exactReference(p.sku,expected.reference)||containsReference(p.name,expected.reference));
   const heading=clean($('h1').first().text());
   const pageRef=clean($('[itemprop="mpn"]').first().attr('content')||$('[itemprop="mpn"]').first().text());
-  if(!match&&!exactReference(pageRef,expected.reference)&&!containsReference(heading,expected.reference))throw Error('La página no acredita la referencia exacta; requiere revisión');
+  if(!match&&!exactReference(pageRef,expected.reference)&&!containsReference(heading,expected.reference)) {
+    if(!heading&&(/enable javascript|javascript.*(?:required|enabled)/i.test($('noscript').text())||$('[data-preload-product-name-wout-brand]').length)) {
+      const error=Error('La ficha requiere JavaScript: el HTML recibido no contiene los datos del producto');error.code='SOURCE_NEEDS_RENDER';throw error;
+    }
+    throw Error('La página no acredita la referencia exacta; requiere revisión');
+  }
   if(structured.length>1&&!containsReference(heading,expected.reference)&&!exactReference(pageRef,expected.reference))throw Error('La referencia solo aparece entre productos relacionados; requiere revisión');
   const product=match||{},brand=clean(typeof product.brand==='object'?product.brand.name:product.brand);
   if(!brand&&!containsReference(heading,expected.brand))throw Error('La página no acredita la marca de la referencia');

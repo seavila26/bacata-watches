@@ -100,3 +100,24 @@ npm run test:pilot -- "ruta\al\inventario.xlsx" --live
 ```
 
 El chequeo visual en navegador sigue pendiente. Se comprobó la estructura de los formularios y tablas mediante DOM, pero no se presentan nuevas capturas de escritorio/móvil. La pasarela de pagos y las reservas siguen pendientes como en v0.4.
+
+## Actualización: lectura renderizada opcional
+
+El HTML inicial de Bulova 98B428 se obtuvo con HTTP 200, título y referencia, pero sin h1, Product JSON-LD ni especificaciones. Ahora se distingue una ficha que requiere JavaScript de una referencia incorrecta o un bloqueo. El título por sí solo nunca acredita características.
+
+Para una fuente cuya consulta automatizada esté autorizada, instala y activa:
+
+```powershell
+npm ci
+npm run browser:install
+```
+
+Añade a tu `.env` existente `ENRICHMENT_RENDER_ENABLED=true` y reinicia con `npm start`. No reemplaces tu `.env`. Por defecto está desactivado.
+
+El navegador se utiliza solo cuando se detecta la estructura inicial sin ficha. Se cierra después de cada pieza. Usa HTTPS con dominios permitidos y DNS público validado, limita solicitudes, tamaño y tiempo, bloquea conexiones WebSocket, service workers, imágenes y peticiones distintas de GET. No inicia sesión ni resuelve verificaciones humanas. Fuentes que dependan de POST, cookies, dominios adicionales o estructuras incompatibles pueden seguir pendientes: utiliza entonces el catálogo autorizado. No se garantiza la extracción de Jomashop.
+
+No basta con encontrar el título: la lectura renderizada exige referencia/marca válidas y al menos una especificación explícita. Cada característica registra el método `rendered/html` o `rendered/structured/html`. La revisión, aprobación y publicación siguen separadas.
+
+Los lotes terminados conservan sus resultados anteriores. Selecciona las diez piezas y crea un nuevo piloto para obtener los nuevos diagnósticos. No ejecutes los 149 hasta revisar las propuestas de ese piloto.
+
+Validación: 19 pruebas aprobadas, incluida una prueba con Chromium real y una ficha controlada que incorpora especificaciones mediante JavaScript. Se comprobó el bloqueo de otro dominio y de POST. La extracción real de las diez páginas de Jomashop permanece pendiente de validación desde la instalación con acceso autorizado.

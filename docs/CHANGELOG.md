@@ -1,3 +1,9 @@
+## Lectura de fuentes con JavaScript
+
+- Diagnósticos específicos para HTML inicial, referencia incorrecta y bloqueo.
+- Chromium opcional, HTTPS limitado y procedencia de datos renderizados.
+- Pruebas de regresión y guía de instalación; sin cambios de base de datos.
+
 # v0.5 · Preparación masiva del catálogo
 
 - Selección de candidatos, prueba inicial de diez y procesamiento del lote en segundo plano.
