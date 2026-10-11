@@ -342,5 +342,8 @@ async function handler(req, res) {
     error(res, e.status || 400, e.status ? e.message : 'Solicitud inválida o error de integración');
   }
 }
+// Align inherited publication flags with the same requirements used by the store.
+db.exec('BEGIN IMMEDIATE');
+try { reconcileAll('system'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
 const server = http.createServer(handler);
 server.listen(PORT, () => console.log(`Bacatá disponible en http://localhost:${server.address().port}`));

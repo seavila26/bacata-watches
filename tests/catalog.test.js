@@ -335,3 +335,28 @@ test('catalog rejects wrong headers, duplicates and unsafe images without downlo
     image_url: 'javascript:alert(1)'
   }, 'admin'), /imagen/);
 });
+
+test('inherited published flags are repaired: one visible product, five paused, and no missing publication dates', async () => {
+  publicationAction([firstId], 'reactivate', 'admin');
+  const base=product();
+  db.prepare('UPDATE products SET published_at=NULL WHERE id=?').run(firstId);
+  const preview=await previewCatalog(await sheet([{brand:'Bulova',reference:'96B349'}]),'admin');
+  const imported=commitCatalog(preview.token,'admin');
+  assert.equal(imported.published,1);
+  assert.ok(product().published_at);
+  for(let i=0;i<5;i++){
+    const row={...base,id:`legacy-${i}`,identity_key:identityKey('Bulova',`LEGACY-${i}`),reference:`LEGACY-${i}`,crystal:'',status:'published',published_at:null};
+    const keys=Object.keys(row);
+    db.prepare(`INSERT INTO products (${keys.join(',')}) VALUES (${keys.map(()=>'?').join(',')})`).run(...keys.map(k=>row[k]));
+    const decorated=decorate(row);
+    assert.equal(decorated.effective_status,'paused');
+    assert.match(decorated.pause_reason,/cristal/);
+    assert.equal(isVisible(row),false);
+  }
+  reconcileAll('system');
+  const rows=db.prepare("SELECT * FROM products WHERE id=? OR id LIKE 'legacy-%'").all(firstId);
+  assert.equal(rows.length,6);
+  assert.equal(rows.filter(p=>isVisible(p)).length,1);
+  assert.equal(rows.filter(p=>p.status==='paused').length,5);
+  assert.ok(rows.every(p=>p.published_at));
+});

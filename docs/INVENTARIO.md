@@ -76,7 +76,7 @@ La tabla reúne todas las referencias con fecha de publicación, incluidas pausa
 
 **Pausar** y **Reactivar** funcionan por fila y por selección. Reactivar comprueba ficha, comparable y margen; devuelve el motivo de cada referencia que no cumple. El editor individual permite corregir un dato, escribir nombre o descripción, aprobar precio y subir fotos.
 
-Después de **más de 72 horas** desde la última confirmación, el estado efectivo es **Requiere confirmación**. La tienda y los pedidos lo comprueban en cada solicitud; no depende de abrir el panel o de un temporizador del navegador. **Confirmar y mantener activa** comprueba requisitos y actualiza la fecha. La primera fecha de publicación se conserva en posteriores reactivaciones.
+Después de **más de 72 horas** desde la última confirmación, el estado efectivo es **Requiere confirmación**. La tienda y los pedidos lo comprueban en cada solicitud; no depende de abrir el panel o de un temporizador del navegador. **Confirmar y mantener activa** comprueba requisitos y actualiza la fecha. La primera fecha de publicación se conserva en posteriores reactivaciones. Al iniciar se reparan fechas ausentes de publicaciones heredadas y se pausan las fichas que no cumplen los requisitos, mostrando el motivo. El estado administrativo usa las mismas reglas que la tienda.
 
 La API pública devuelve una lista explícita de campos de presentación, precio de venta y condiciones globales. Excluye enlaces del proveedor, costos, márgenes, precio aprobado, snapshots, análisis y datos operativos. La disponibilidad pública es **Disponible**, sin conteo de unidades. La bolsa admite cantidades de 1 a 10 por solicitud de prueba; ese límite no representa existencias.
 

@@ -11,6 +11,8 @@ export function reconcileProduct(p, {
   let status = p.status,
     reason = p.pause_reason || '',
     published = p.published_at;
+  // Repair published records that predate publication timestamp tracking.
+  if (p.status === 'published' && !published) published = p.reviewed_at || p.updated_at || now;
   if (p.status === 'published' && issues.length) {
     status = 'paused';
     reason = issues.join('; ');
@@ -92,5 +94,5 @@ export function publicationAction(ids, action, actor) {
   }
 }
 export function isVisible(p, now = Date.now()) {
-  return publicationState(p, now) === 'published' && !publicationIssues(p, calculate(p)).length;
+  return publicationState(p, now, calculate(p)) === 'published';
 }

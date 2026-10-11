@@ -91,7 +91,8 @@ export function decorate(p, s = settings()) {
   const analysis = calculate(p, s);
   return {
     ...p,
-    effective_status: publicationState(p),
+    effective_status: publicationState(p, Date.now(), analysis),
+    pause_reason: p.status === 'published' && publicationIssues(p, analysis).length ? publicationIssues(p, analysis).join('; ') : p.pause_reason,
     images: JSON.parse(p.images_json || '[]'),
     source: p.source_snapshot_json ? JSON.parse(p.source_snapshot_json) : null,
     analysis,

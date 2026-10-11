@@ -135,3 +135,9 @@ test('public detail includes all three photos and global delivery with no stock 
   assert.match(html, /data-action="add"/);
   assert.doesNotMatch(html, /unidades|Existencias propias|Análisis de rentabilidad/);
 });
+
+test('publication list includes a published row even if its historical date is missing', () => {
+  state.admin.products=[{...products[0],published_at:null}];
+  state.publicationFilter={brand:'',status:'',query:'',sort:'published_at',direction:'desc'};
+  assert.equal(filteredPublications().length,1);
+});

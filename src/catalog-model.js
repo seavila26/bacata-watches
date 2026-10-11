@@ -75,7 +75,8 @@ export function publicationIssues(p, a) {
   if (a.margin == null) issues.push('Por cotizar: margen no calculable');else if (!a.eligible) issues.push('Margen inferior al mínimo');
   return issues;
 }
-export function publicationState(p, now = Date.now()) {
+export function publicationState(p, now = Date.now(), analysis = null) {
+  if (p.status === 'published' && analysis && publicationIssues(p, analysis).length) return 'paused';
   if (p.status === 'published' && (!p.last_confirmed_at || !Number.isFinite(Date.parse(p.last_confirmed_at)) || now - Date.parse(p.last_confirmed_at) > 3 * 86400000)) return 'requires_confirmation';
   return p.status;
 }
