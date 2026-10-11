@@ -1,0 +1,16 @@
+/* Calm feedback; content stays visible when JavaScript or motion is unavailable. */
+@media (prefers-reduced-motion: no-preference) {
+  body, .site-header, .site-footer { transition: background-color 180ms ease, color 180ms ease; }
+  .view-enter { animation: view-enter 260ms ease both; }
+  .reveal-ready { opacity: 0; transform: translateY(20px); transition: opacity 500ms ease, transform 500ms ease; }
+  .reveal-ready.is-revealed { opacity: 1; transform: translateY(0); }
+  .product-card, .workflow-card, .metric-card { transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease; }
+  .product-card:hover, .workflow-card:hover { transform: translateY(-3px); }
+  .text-link .icon, .workflow-card__link .icon, .product-card__open .icon { transition: transform 180ms ease; }
+  .text-link:hover .icon, .workflow-card:hover .workflow-card__link .icon, .product-card:hover .product-card__open .icon { transform: translateX(3px); }
+  dialog[open] { animation: view-enter 180ms ease both; }
+}
+@keyframes view-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .reveal-ready { opacity: 1; transform: none; }
+}

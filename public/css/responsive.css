@@ -1,6 +1,6 @@
 @media (min-width: 1440px) {
-  .site-header { grid-template-columns: 220px 1fr auto; }
-  .site-header .logo img { width: 220px; }
+  .site-header { grid-template-columns: 180px 1fr auto; }
+  .site-header .logo img { width: 180px; }
 }
 @media (max-width: 1100px) {
   .site-header { gap: 24px; }
@@ -19,6 +19,7 @@
 @media (max-width: 900px) {
   .site-header { grid-template-columns: 48px 1fr auto; min-height: 0; padding: 16px 24px; }
   .site-header .logo { justify-self: center; }
+  .site-header .logo img { width: 140px; }
   .mobile-menu { display: inline-flex; }
   .desktop-nav { display: none; }
   .header-actions { gap: 12px; }
@@ -116,4 +117,45 @@
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* Workspace collapses to a keyboard-accessible horizontal navigation. */
+@media(max-width:1200px) {
+  .admin-shell { grid-template-columns: 208px minmax(0,1fr); gap: 24px; }
+  .workflow-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .operations-focus { align-items: flex-start; flex-direction: column; gap: 24px; }
+  .admin-metrics { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:900px) {
+  .admin-shell { grid-template-columns: minmax(0,1fr); }
+  .admin-sidebar { position: static; max-height: none; padding: 16px; overflow: visible; }
+  .sidebar-heading { padding: 0 0 16px; }.sidebar-heading .sidebar-symbol { width: 36px; height: 36px; }
+  .tabs.admin-nav { display: flex; overflow-x: auto; padding-bottom: 8px; }
+  .tabs.admin-nav button { flex-shrink: 0; }.admin-nav small { margin-left: 0; }
+  .sidebar-bottom { display: none; }
+  .admin-sidebar:after { content: 'Desliza para ver las secciones'; display: block; padding-top: 4px; color: #BDC9DA; font-size: 12px; }
+  .is-admin main>.admin-login { max-width: 760px; }.login-story { padding: 32px; }.login-story h1 { font-size: 38px; }.login-form-panel { padding: 32px; }
+}
+@media(max-width:700px) {
+  .admin-top h1 { font-size: 38px; }.admin-top>.btn { margin-top: 8px; }
+  .admin-shell { padding: 24px 20px 48px; gap: 24px; }
+  .metric-card { padding: 16px; }.metric-card strong { font-size: 40px; }
+  .operations-focus { padding: 24px; }.operations-focus h2 { font-size: 28px; }
+  .workflow-card { padding: 20px 16px; }.workflow-note { max-width: none; }
+  .attention-panel { padding: 20px; }.attention-item { gap: 12px; }
+  .is-admin main>.admin-login { grid-template-columns: 1fr; padding-block: 32px 64px; }
+  .login-story { border-radius: 8px 8px 0 0; }.login-story h1 { font-size: 38px; margin-bottom: 24px; }
+  .login-form-panel { border-radius: 0 0 8px 8px; padding: 32px 24px; }
+  .brand-rail { gap: 16px 24px; }.brand-rail>span { width: 100%; }
+  .catalog-sort { width: 100%; justify-content: space-between; flex-wrap: wrap; }.catalog-sort select { flex-grow: 1; }
+}
+@media(max-width:400px) {
+  .site-header { grid-template-columns: 44px minmax(0,1fr) auto; padding: 12px; gap: 4px; }
+  .site-header .logo { grid-column: 2; grid-row: 1; padding: 0; justify-self: center; }.site-header .logo img { width: 92px; }
+  .mobile-menu { grid-column: 1; grid-row: 1; width: 44px; }
+  .header-actions { grid-column: 3; grid-row: 1; gap: 0; }.header-actions .icon-button, .header-action { width: 44px; min-height: 44px; padding: 0; }
+  .header-actions .search-trigger { display: inline-flex; }.header-actions .header-action[href="#/carrito"] { width: 60px; }
+  .workflow-grid { grid-template-columns: minmax(0,1fr); }.workflow-card { gap: 12px; }
+  .metric-card__label { font-size: 12px; }.metric-card__label .icon { display: none; }
+  .admin-metrics { gap: 12px; }.metric-card { padding: 16px 12px; }
 }

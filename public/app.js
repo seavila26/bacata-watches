@@ -8,12 +8,19 @@ import { activeCampaign } from './js/config.js';
 import { filteredOpportunities } from './js/views/admin.js';
 import { filteredPublications } from './js/views/publications.js';
 import { filteredPreview } from './js/views/inventory.js';
-import { admin } from './js/views/admin.js';
+import { admin, adminSections } from './js/views/admin.js';
+import { enhanceView, enterView, toggleTheme } from './js/experience.js';
 const main = document.querySelector('#main');
 const toastEl = document.querySelector('#toast');
 let routeSequence = 0;
-function toast(message) {
+function toast(message, link = '') {
   toastEl.textContent = message;
+  if (link) {
+    const action = document.createElement('a');
+    action.href = link;
+    action.textContent = 'Ver bolsa →';
+    toastEl.append(action);
+  }
   toastEl.classList.add('on');
   clearTimeout(toast.timer);
   toast.timer = setTimeout(() => toastEl.classList.remove('on'), 4200);
@@ -34,7 +41,14 @@ function currentRoute() {
     query: new URLSearchParams(query || '')
   };
 }
+function syncCatalogLocation() {
+  const query = new URLSearchParams(Object.entries(state.filters).filter(([, value]) => value));
+  if (state.catalogSort !== 'selection') query.set('sort', state.catalogSort);
+  history.replaceState(null, '', `#/catalogo${query.size ? '?' + query.toString() : ''}`);
+}
 function render() {
+  const focused = document.activeElement;
+  const focusSelector = focused?.id ? `#${CSS.escape(focused.id)}` : focused?.dataset.opportunityId ? `[data-opportunity-id="${CSS.escape(focused.dataset.opportunityId)}"]` : focused?.dataset.publicationId ? `[data-publication-id="${CSS.escape(focused.dataset.publicationId)}"]` : focused?.dataset.importIndex !== undefined ? `[data-import-index="${focused.dataset.importIndex}"]` : focused?.name && focused.closest('form')?.id ? `#${CSS.escape(focused.closest('form').id)} [name="${CSS.escape(focused.name)}"]` : null;
   const {
     path,
     query
@@ -56,6 +70,9 @@ function render() {
     if (selected) a.setAttribute('aria-current', 'page');else a.removeAttribute('aria-current');
   });
   saveCart();
+  enhanceView(main);
+  if (focusSelector) document.querySelector(focusSelector)?.focus({ preventScroll: true });
+  document.title = path.startsWith('/admin') ? `${adminSections.find(([key]) => key === state.tab)?.[1] || 'Administración'} · Bacatá` : 'Relojería Bacatá — Tiempo que se siente';
 }
 function loading() {
   main.innerHTML = '<section class="wrap loading-state" role="status" aria-label="Cargando selección"><span class="eyebrow">BACATÁ</span><div class="skeleton skeleton-title"></div><div class="skeleton-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><p>Preparando la selección…</p></section>';
@@ -63,19 +80,27 @@ function loading() {
 async function route() {
   const sequence = ++routeSequence;
   document.querySelectorAll('dialog[open]').forEach(d => d.close());
+  clearTimeout(toast.timer);
+  toastEl.classList.remove('on');
   loading();
   try {
     const {
       path,
       query
     } = currentRoute();
-    if (path === '/catalogo' && query.has('brand')) state.filters.brand = query.get('brand');
+    if (path === '/catalogo' && query.size) {
+      Object.keys(state.filters).forEach(key => state.filters[key] = query.get(key) || '');
+      state.catalogSort = ['price-asc', 'price-desc', 'brand'].includes(query.get('sort')) ? query.get('sort') : 'selection';
+    }
     if (path === '/catalogo' && query.has('collection')) {
       const collection = query.get('collection');
       if (collection === 'automaticos') state.filters.q = 'automático';
       if (collection === 'diario') state.filters.q = '';
     }
     if (path.startsWith('/admin')) {
+      const section = path.slice('/admin/'.length);
+      if (adminSections.some(([key]) => key === section)) state.tab = section;
+      state.selected = null;
       const session = await api('/api/admin/session');
       const data = session.authenticated ? await api('/api/admin/overview') : null;
       if (sequence !== routeSequence) return;
@@ -87,6 +112,7 @@ async function route() {
     }
     render();
     scrollTo(0, 0);
+    enterView(main);
     main.focus({
       preventScroll: true
     });
@@ -140,6 +166,36 @@ async function act(button) {
     id
   } = button.dataset;
   switch (action) {
+    case 'theme':
+      toggleTheme();
+      return;
+    case 'admin-shortcut':
+      if (button.dataset.tab === 'publicaciones') {
+        state.publicationFilter = { ...state.publicationFilter, query: '', brand: '', status: button.dataset.status || '' };
+        state.publicationPage = 0;
+      } else if (button.dataset.tab === 'oportunidades') {
+        state.adminQuery = '';
+        state.adminStatus = button.dataset.status || '';
+        state.opportunityFilter = 'all';
+        state.adminPage = 0;
+      }
+      // Falls through to section navigation. No publication operation is performed.
+    case 'tab':
+      clearTimeout(toast.timer);
+      toastEl.classList.remove('on');
+      state.tab = button.dataset.tab;
+      state.selected = null;
+      history.pushState(null, '', `#/admin/${state.tab}`);
+      render();
+      document.querySelector('#admin-tabpanel')?.focus({ preventScroll: true });
+      enterView(document.querySelector('#admin-tabpanel'));
+      return;
+    case 'remove-filter':
+      if (button.dataset.filterKey in state.filters) state.filters[button.dataset.filterKey] = '';
+      syncCatalogLocation();
+      render();
+      document.querySelector('#search')?.focus({ preventScroll: true });
+      return;
     case 'field-history':
       {
         const result = await api(`/api/admin/products/${encodeURIComponent(id)}/history`);
@@ -226,6 +282,7 @@ async function act(button) {
         state.importPreview = null;
         state.importSelection.clear();
         state.tab = 'oportunidades';
+        history.replaceState(null, '', '#/admin/oportunidades');
         state.adminPage = 0;
         state.adminQuery = '';
         state.adminStatus = '';
@@ -252,7 +309,7 @@ async function act(button) {
         if (quantity >= 10) throw Error('Ya alcanzaste la límite de 10 piezas por solicitud.');
         state.cart[id] = quantity + 1;
         saveCart();
-        toast('Pieza añadida a tu bolsa.');
+        toast('Pieza añadida a tu bolsa.', '#/carrito');
         return;
       }
     case 'remove':
@@ -261,11 +318,7 @@ async function act(button) {
       return;
     case 'clear-filters':
       Object.keys(state.filters).forEach(k => state.filters[k] = '');
-      render();
-      return;
-    case 'tab':
-      state.tab = button.dataset.tab;
-      state.selected = null;
+      syncCatalogLocation();
       render();
       return;
     case 'review':
@@ -342,6 +395,12 @@ document.addEventListener('click', async event => {
 });
 document.addEventListener('change', async event => {
   const input = event.target;
+  if (input.id === 'catalog-sort') {
+    state.catalogSort = input.value;
+    syncCatalogLocation();
+    render();
+    return;
+  }
   if (input.dataset.opportunityId) {
     if (input.checked) state.opportunitySelection.add(input.dataset.opportunityId);else state.opportunitySelection.delete(input.dataset.opportunityId);
     render();
@@ -397,6 +456,7 @@ document.addEventListener('change', async event => {
   }
   if (input.id === 'brand' || input.dataset.filter) {
     state.filters[input.id === 'brand' ? 'brand' : input.dataset.filter] = input.value;
+    syncCatalogLocation();
     const selector = input.id === 'brand' ? '#brand' : `[data-filter="${input.dataset.filter}"]`;
     render();
     document.querySelector(selector)?.focus();
@@ -417,6 +477,7 @@ document.addEventListener('input', event => {
   if (event.target.id !== 'search') return;
   const position = event.target.selectionStart;
   state.filters.q = event.target.value;
+  syncCatalogLocation();
   render();
   const input = document.querySelector('#search');
   input.focus();
@@ -485,7 +546,10 @@ document.addEventListener('submit', async event => {
     if (form.id === 'global-search') {
       state.filters.q = form.elements.query.value.trim();
       document.querySelector('#search-dialog').close();
-      if (location.hash === '#/catalogo') render();else location.hash = '#/catalogo';
+      if (currentRoute().path === '/catalogo') { syncCatalogLocation(); render(); } else {
+        const query = new URLSearchParams({ q: state.filters.q });
+        location.hash = '#/catalogo?' + query.toString();
+      }
     }
     if (form.id === 'login') {
       await request('/api/admin/login', 'POST', Object.fromEntries(new FormData(form)));
@@ -516,15 +580,16 @@ document.addEventListener('submit', async event => {
 });
 document.addEventListener('keydown', event => {
   const tab = event.target.closest('.tabs [role="tab"]');
-  if (!tab || !['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+  if (!tab || !['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
   event.preventDefault();
   const tabs = [...document.querySelectorAll('.tabs [role="tab"]')];
   let index = tabs.indexOf(tab);
-  index = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+  index = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (['ArrowRight', 'ArrowDown'].includes(event.key) ? 1 : -1) + tabs.length) % tabs.length;
   const next = tabs[index];
   const key = next.dataset.tab;
   state.tab = key;
   state.selected = null;
+  history.replaceState(null, '', `#/admin/${key}`);
   render();
   document.querySelector(`.tabs [data-tab="${key}"]`).focus();
 });

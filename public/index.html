@@ -8,6 +8,7 @@
   <title>Relojería Bacatá — Tiempo que se siente</title>
   <link rel="preload" href="/assets/fonts/Caladea-Regular.woff" as="font" type="font/woff" crossorigin>
   <link rel="preload" href="/assets/fonts/NotoSans-Regular.woff" as="font" type="font/woff" crossorigin>
+  <script src="/js/theme-init.js"></script>
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
@@ -19,6 +20,7 @@
     <a class="logo" href="#/" aria-label="Relojería Bacatá, inicio"><img src="/assets/bacata-logo.png" width="220" height="190" alt="Relojería Bacatá"></a>
     <nav class="desktop-nav" aria-label="Navegación principal"><a href="#/catalogo">Relojes</a><a href="#/marcas">Marcas</a><a href="#/como-elegimos">Cómo elegimos</a><a href="#/editorial">Editorial</a><a href="#/contacto">Contacto</a></nav>
     <div class="header-actions">
+      <button class="icon-button theme-toggle" data-action="theme" aria-label="Activar modo oscuro" aria-pressed="false"><svg class="icon theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M20 15.5A9 9 0 0 1 8.5 4a9 9 0 1 0 11.5 11.5Z"/></svg><svg class="icon theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button>
       <button class="header-action search-trigger" data-action="search" aria-label="Buscar relojes"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg><span>Buscar</span></button>
       <a class="header-action bag-link" href="#/carrito" aria-label="Bolsa de compra"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M6 8h12l1 13H5L6 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg><span class="bag-label">Bolsa</span><span id="cart-count" class="bag-count">0</span></a>
     </div>
@@ -28,7 +30,7 @@
     <div class="footer-main"><div class="footer-brand"><a class="logo" href="#/"><img src="/assets/bacata-logo.png" width="220" height="190" alt="Relojería Bacatá"></a><p>Una identidad con raíces.<br>Una forma propia de elegir el tiempo.</p></div><div><h2>Explorar</h2><a href="#/catalogo">Relojes</a><a href="#/marcas">Marcas</a><a href="#/editorial">Editorial</a></div><div><h2>Acompañamiento</h2><a href="#/como-elegimos">Cómo elegimos</a><a href="#/contacto">Contacto y asesoría</a><a href="#/condiciones">Información de compra</a></div><div class="footer-signature"><p>Tiempo que<br><em>se siente.</em></p><a href="#/admin">Acceso administrativo</a></div></div>
     <div class="footer-bottom"><span>Relojería Bacatá · Bogotá</span><span>Versión de desarrollo · catálogo de demostración</span></div>
   </footer>
-  <dialog id="search-dialog" class="search-dialog" aria-labelledby="search-title"><div class="dialog-head"><h2 id="search-title">Encuentra tu pieza.</h2><button class="icon-button" data-action="close-dialog" aria-label="Cerrar búsqueda">×</button></div><form id="global-search"><label for="global-query">Marca, modelo o referencia</label><div class="search-dialog__field"><input id="global-query" name="query" type="search" placeholder="Ej. Atlas, NV-4101" required><button class="btn">Buscar</button></div></form></dialog>
+  <dialog id="search-dialog" class="search-dialog" aria-labelledby="search-title"><div class="dialog-head"><h2 id="search-title">Encuentra tu pieza.</h2><button class="icon-button" data-action="close-dialog" aria-label="Cerrar búsqueda">×</button></div><form id="global-search"><label for="global-query">Marca, modelo o referencia</label><div class="search-dialog__field"><input id="global-query" name="query" type="search" placeholder="Escribe una marca o referencia" required><button class="btn">Buscar</button></div></form></dialog>
   <dialog id="menu-dialog" class="menu-dialog" aria-labelledby="menu-title"><div class="dialog-head"><h2 id="menu-title">Bacatá</h2><button class="icon-button" data-action="close-dialog" aria-label="Cerrar menú">×</button></div><nav aria-label="Menú móvil"><a href="#/catalogo">Relojes</a><a href="#/marcas">Marcas</a><a href="#/como-elegimos">Cómo elegimos</a><a href="#/editorial">Editorial</a><a href="#/contacto">Contacto</a><a href="#/admin">Administración</a></nav></dialog>
   <dialog id="image-dialog" class="image-dialog" aria-label="Imagen ampliada del reloj"><button class="icon-button" data-action="close-dialog" aria-label="Cerrar imagen">×</button><div id="zoom-content"></div></dialog>
   <div id="toast" role="status" aria-live="polite"></div>

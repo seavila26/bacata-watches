@@ -141,3 +141,45 @@ test('publication list includes a published row even if its historical date is m
   state.publicationFilter={brand:'',status:'',query:'',sort:'published_at',direction:'desc'};
   assert.equal(filteredPublications().length,1);
 });
+
+test('overview counts effective visibility rather than historical publication flags', async () => {
+  const { operationCounts, overview } = await import('../public/js/views/admin-overview.js');
+  const sample = [
+    { id: 'active', status: 'published', effective_status: 'published' },
+    { id: 'expired', status: 'published', effective_status: 'requires_confirmation', brand: 'Prueba', reference: '<REF>', pause_reason: '' },
+    { id: 'draft', status: 'pending', effective_status: 'pending' },
+    { id: 'paused', status: 'paused', effective_status: 'paused', brand: 'Prueba', reference: 'REF-2', pause_reason: '' }
+  ];
+  assert.deepEqual(operationCounts(sample), { total: 4, published: 1, pending: 1, paused: 1, confirmation: 1 });
+  const html = overview({ products: sample });
+  assert.match(html, /Confirmar la vigencia/);
+  assert.match(html, /data-tab="publicaciones" data-status="requires_confirmation"/);
+  assert.match(html, /data-action="review" data-id="expired"/);
+  assert.ok(!html.includes('<REF>'));
+  assert.match(overview({ products: [] }), /Tu selección empieza aquí/);
+});
+
+test('catalog movement search and price ordering preserve source order and escape removable filters', async () => {
+  const { catalog } = await import('../public/js/views/store.js');
+  const before = { products: state.products, filters: state.filters, catalogSort: state.catalogSort };
+  try {
+    state.products = [
+      { ...products[0], id: 'costly', reference: 'REF-EXPENSIVE', name: 'Mayor precio', movement: 'Automático', price_cop: 5000000 },
+      { ...products[1], id: 'low', reference: 'REF-LOW', name: 'Menor precio', movement: 'Cuarzo', price_cop: 2000000 }
+    ];
+    state.filters = { q: '', brand: '', price: '', movement: '', diameter: '', style: '', availability: '' };
+    state.catalogSort = 'price-asc';
+    const sorted = catalog();
+    assert.ok(sorted.indexOf('href="#/reloj/low"') < sorted.indexOf('href="#/reloj/costly"'));
+    assert.equal(state.products[0].id, 'costly');
+    state.filters.q = 'automático';
+    const movement = catalog();
+    assert.match(movement, /href="#\/reloj\/costly"/);
+    assert.ok(!movement.includes('href="#/reloj/low"'));
+    state.filters.q = '<script>alert(1)</script>';
+    const empty = catalog();
+    assert.match(empty, /data-action="remove-filter" data-filter-key="q"/);
+    assert.ok(!empty.includes('<script>'));
+    assert.match(empty, /No encontramos esa pieza/);
+  } finally { Object.assign(state, before); }
+});

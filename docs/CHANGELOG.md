@@ -15,6 +15,16 @@
 - Publicaciones heredadas incompletas se pausan con el motivo, conservando contenido y fotografías.
 - 19 pruebas aprobadas, incluyendo seis estados heredados con una sola ficha visible.
 
+## Experiencia visual y administración · 11 octubre 2026
+
+- Modos claro y oscuro con preferencia persistente y logo original sin invertir.
+- Resumen operativo con estados efectivos, prioridad de revisión y accesos a cuatro etapas.
+- Navegación administrativa lateral en escritorio y horizontal en móvil, rutas por sección y teclado.
+- Filtros removibles, orden por precio/marca y búsqueda por movimiento en el catálogo; filtros y orden en la URL.
+- Transiciones sutiles, movimiento reducido, áreas de selección de 44 px y fechas legibles en Bogotá.
+- Confirmación de vigencia visible en referencias activas, acceso a publicaciones después de importar fichas y mejor separación de formularios.
+- Sin cambios de backend, dependencias, inventarios ni fórmula. Validación descrita en `QA-EXPERIENCIA.md`.
+
 ## Versiones anteriores
 
 v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorporó importación XLSX y editor persistente. v0.5 incorporó un flujo de preparación de catálogo que esta versión reemplaza por completo.
