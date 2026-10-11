@@ -7,9 +7,27 @@ function readCart() {
   }
 }
 export const state = {
-  bulkSelection:new Set(),bulkFilter:'launch',bulkQuery:'',bulkPage:0,bulkPlan:null,proposalSelection:new Set(),proposalEdits:{},proposalFilter:'proposed',proposalPage:0,
-  importPreview: null, importSelection: new Set(), importFilter: 'all', importQuery: '', importPage: 0,
-  adminQuery: '', adminStatus: '', adminPage: 0,
+  opportunitySelection: new Set(),
+  opportunityFilter: 'launch',
+  publicationSelection: new Set(),
+  publicationPage: 0,
+  publicationFilter: {
+    brand: '',
+    status: '',
+    query: '',
+    sort: 'published_at',
+    direction: 'desc'
+  },
+  catalogPreview: null,
+  catalogResult: null,
+  importPreview: null,
+  importSelection: new Set(),
+  importFilter: 'launch',
+  importQuery: '',
+  importPage: 0,
+  adminQuery: '',
+  adminStatus: '',
+  adminPage: 0,
   products: [],
   admin: null,
   tab: 'oportunidades',

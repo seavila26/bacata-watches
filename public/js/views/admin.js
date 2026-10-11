@@ -1,177 +1,54 @@
-import {bulkCatalog} from './catalog-bulk.js';
-import {inventory} from './inventory.js';
-import {productEditor} from './product-editor.js';
+import { inventory } from './inventory.js';
+import { catalogImport } from './catalog-import.js';
+import { publications } from './publications.js';
+import { productEditor } from './product-editor.js';
 import { state } from '../state.js';
-import { money, percent, escapeHtml } from '../utils.js';
-const statusLabel = {
-  pending: 'Pendiente',
-  published: 'Publicado',
-  discarded: 'Descartado',
-  paused: 'Pausado'
+import { money, percent, escapeHtml as esc } from '../utils.js';
+export const statusLabels = {
+  pending: 'Borrador',
+  published: 'Publicada',
+  paused: 'Pausada',
+  requires_confirmation: 'Requiere confirmación'
 };
-const statusTag = p => `<span class="tag ${p.status === 'published' ? 'good' : p.status === 'pending' ? 'warn' : 'bad'}">${statusLabel[p.status] || p.status}</span>`;
+export function launchMatch(p) {
+  return p.analysis.margin >= .10 && p.analysis.comparable && p.source?.availability === 'In Stock.' && p.analysis.price_usd <= 2000;
+}
+export function filteredOpportunities() {
+  return state.admin.products.filter(p => (!state.adminQuery || `${p.brand} ${p.name} ${p.reference}`.toLowerCase().includes(state.adminQuery.toLowerCase())) && (!state.adminStatus || p.effective_status === state.adminStatus) && (state.opportunityFilter === 'all' || (state.opportunityFilter === 'launch' ? launchMatch(p) : state.opportunityFilter === 'pending' ? p.analysis.margin == null : state.opportunityFilter === 'review' ? !p.analysis.comparable : state.opportunityFilter === 'high' ? p.analysis.margin > .2 : state.opportunityFilter === 'priority' ? p.analysis.margin >= .1 && p.analysis.margin <= .2 : state.opportunityFilter === 'low' ? p.analysis.margin >= .02 && p.analysis.margin < .1 : p.analysis.margin != null && p.analysis.margin < .02)));
+}
+export const tag = p => `<span class="tag ${p.effective_status === 'published' ? 'good' : 'warn'}">${esc(statusLabels[p.effective_status] || p.effective_status)}</span>`;
+const amount = v => v == null ? 'Por cotizar' : money(v);
+export function profitability(p) {
+  const a = p.analysis;
+  return `<section class="panel"><h3>Análisis de rentabilidad</h3>${[['Precio proveedor (USD ' + (a.price_usd ?? '—') + ')', a.supplier], ['Envío proveedor (USD ' + (a.shipping_usd ?? '—') + ')', a.shipping], ['Importación e impuestos', a.importCost], ['Comisión', a.commission], ['Colchón logístico', a.buffer], ['Costo total estimado', a.cost], ['Precio de mercado', a.market], ['Venta sugerida', a.suggested], ['Precio aprobado', p.approved_price_cop], ['Precio de publicación', a.price], ['Contribución', a.profit]].map(([label, value]) => `<div class="breakdown"><span>${esc(label)}</span><strong>${amount(value)}</strong></div>`).join('')}<div class="breakdown emphasis"><span>Margen sobre venta</span><strong>${a.margin == null ? 'Por cotizar' : percent(a.margin)}</strong></div>${a.quote_reason ? `<p class="notice">${esc(a.quote_reason)}</p>` : ''}<p class="muted">Tasa ${money(a.fx)}/USD. Costo total = compra + envío + importación e impuestos + comisión + colchón logístico.</p></section>`;
+}
 export function login() {
-  return `<section class="wrap">
-    <span class="eyebrow">ACCESO PRIVADO</span>
-    <h1>Administración</h1>
-    <form id="login" class="panel">
-    <label class="field">Correo<input type="email" name="email" autocomplete="username" required>
-    </label>
-    <label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required>
-    </label>
-    <button class="btn">Ingresar</button>
-    </form>
-    </section>`;
+  return `<section class="wrap"><span class="eyebrow">ACCESO PRIVADO</span><h1>Administración</h1><form id="login" class="panel"><label class="field">Correo<input type="email" name="email" autocomplete="username" required></label><label class="field">Contraseña<input type="password" name="password" autocomplete="current-password" required></label><button class="btn">Ingresar</button></form></section>`;
+}
+function opportunities() {
+  const rows = filteredOpportunities();
+  state.adminPage = Math.min(Math.max(0, state.adminPage), Math.max(0, Math.ceil(rows.length / 50) - 1));
+  return `<div class="stats">${[[rows.length, 'Resultados'], [state.opportunitySelection.size, 'Seleccionados'], [rows.filter(p => p.analysis.eligible).length, 'Superan margen mínimo']].map(([n, label]) => `<div class="panel"><b>${n}</b>${label}</div>`).join('')}</div><form id="admin-filter" class="admin-filters"><label>Buscar<input name="query" type="search" value="${esc(state.adminQuery)}"></label><label>Grupo<select name="group">${Object.entries({
+    launch: 'Inicio: margen ≥10%, In Stock, compra ≤USD 2.000',
+    all: 'Todas',
+    high: 'Margen >20%',
+    priority: 'Margen 10–20%',
+    low: 'Margen 2–10%',
+    outside: 'Fuera de margen',
+    pending: 'Por cotizar',
+    review: 'Comparable por revisar'
+  }).map(([v, l]) => `<option value="${v}" ${v === state.opportunityFilter ? 'selected' : ''}>${l}</option>`).join('')}</select></label><label>Estado<select name="status"><option value="">Todos</option>${Object.entries(statusLabels).map(([v, l]) => `<option value="${v}" ${v === state.adminStatus ? 'selected' : ''}>${l}</option>`).join('')}</select></label><button class="btn secondary">Filtrar</button></form>
+ <div class="selection-toolbar"><div class="actions"><button class="btn secondary" data-action="select-opportunities">Seleccionar resultados de todas las páginas</button><button class="btn secondary" data-action="clear-opportunities">Limpiar selección</button><button class="btn" data-action="export-opportunities" ${!rows.length && !state.opportunitySelection.size ? 'disabled' : ''}>Exportar plantilla de fichas</button></div><p class="muted">Exporta la selección; si no hay selección, todos los resultados filtrados.</p></div>
+ <div class="table-wrap"><table><thead><tr><th>Elegir</th><th>Marca / referencia</th><th>Compra USD</th><th>Costo total</th><th>Mercado</th><th>Venta sugerida</th><th>Precio aprobado</th><th>Contribución</th><th>Margen</th><th>Estado</th><th></th></tr></thead><tbody>${rows.slice(state.adminPage * 50, (state.adminPage + 1) * 50).map(p => `<tr><td><input type="checkbox" data-opportunity-id="${esc(p.id)}" aria-label="Seleccionar ${esc(p.reference)}" ${state.opportunitySelection.has(p.id) ? 'checked' : ''}></td><td><strong>${esc(p.brand)}</strong><small>${esc(p.reference)}</small></td><td>${p.analysis.price_usd ?? 'Por cotizar'}</td><td>${amount(p.analysis.cost)}</td><td>${amount(p.analysis.market)}</td><td>${amount(p.analysis.suggested)}</td><td>${amount(p.approved_price_cop)}</td><td>${amount(p.analysis.profit)}</td><td>${p.analysis.margin == null ? 'Por cotizar' : percent(p.analysis.margin)}</td><td>${tag(p)}</td><td><button class="btn secondary" data-action="review" data-id="${esc(p.id)}">Examinar</button></td></tr>`).join('') || '<tr><td colspan="11">Sin resultados.</td></tr>'}</tbody></table></div><div class="pagination"><button class="btn secondary" data-action="admin-page" data-delta="-1" ${!state.adminPage ? 'disabled' : ''}>Anterior</button><span>${rows.length} referencias · página ${state.adminPage + 1}</span><button class="btn secondary" data-action="admin-page" data-delta="1" ${(state.adminPage + 1) * 50 >= rows.length ? 'disabled' : ''}>Siguiente</button></div>`;
+}
+function settingsView(s) {
+  return `<form id="settings-form" class="panel"><h2>Administración</h2><div class="settings-grid">${[['fx', 'Tasa COP/USD'], ['duty', 'Importación e impuestos (%)'], ['fee', 'Comisión (%)'], ['logistics_rate', 'Colchón logístico (%)'], ['discount', 'Descuento sobre mercado (%)'], ['min_margin', 'Margen mínimo (%)']].map(([k, l]) => `<label>${l}<input name="${k}" type="number" min="0" step="any" value="${k === 'fx' ? esc(s[k]) : Number(s[k]) * 100}" required></label>`).join('')}</div>${[['delivery_days', 'Plazo de entrega global'], ['warranty', 'Garantía global'], ['shipping_terms', 'Condiciones de envío globales']].map(([k, l]) => `<label class="field">${l}<textarea name="${k}" required>${esc(s[k])}</textarea></label>`).join('')}<p class="notice">Los cambios recalculan todas las oportunidades. Las publicaciones cuyo margen quede por debajo del mínimo se pausan.</p><button class="btn">Guardar parámetros</button></form>`;
 }
 export function admin() {
   if (!state.admin) return login();
-  const d = state.admin,
-    allRows = d.products,
-    rows = allRows.filter(p => (!state.adminQuery || `${p.brand} ${p.name} ${p.reference}`.toLowerCase().includes(state.adminQuery.toLowerCase())) && (!state.adminStatus || p.status === state.adminStatus)),
-    s = d.settings;
+  const d = state.admin;
   let content = '';
-  if (state.tab === 'oportunidades') {
-    const selected = allRows.find(p => p.id === state.selected);
-    content = selected ? adminDetail(selected) : `<div class="stats">
-    <div class="panel">
-    <b>${rows.length}</b>Referencias</div>
-    <div class="panel">
-    <b>${rows.filter(p => p.status === 'pending').length}</b>Pendientes</div>
-    <div class="panel">
-    <b>${rows.filter(p => p.analysis.eligible && p.status === 'pending').length}</b>Cumplen regla</div>
-    <div class="panel">
-    <b>${rows.filter(p => p.status === 'published').length}</b>Publicados</div>
-    </div>
-    <p class="notice">Las referencias iniciales son de demostración. Las importadas conservan su corte y necesitan revisión comercial. Importar no equivale a publicar ni confirma stock propio.</p>
-    <form id="admin-filter" class="admin-filters"><label>Marca, nombre o referencia<input type="search" name="query" value="${escapeHtml(state.adminQuery)}"></label><label>Estado<select name="status"><option value="">Todos</option>${Object.entries(statusLabel).map(([key,label])=>`<option value="${key}" ${state.adminStatus===key?'selected':''}>${label}</option>`).join('')}</select></label><button class="btn secondary">Filtrar</button></form>
-    <div class="table-wrap">
-    <table>
-    <thead>
-    <tr>
-    <th>Referencia</th>
-    <th>Proveedor</th>
-    <th>Compra USD</th>
-    <th>Mercado COP</th>
-    <th>Costo total</th>
-    <th>Venta propuesta</th>
-    <th>Utilidad</th>
-    <th>Margen</th>
-    <th>Estado</th>
-    <th>Revisión</th>
-    </tr>
-    </thead>
-    <tbody>${rows.slice(state.adminPage*50,(state.adminPage+1)*50).map(p => `<tr>
-    <td>
-    <strong>${escapeHtml(p.reference)}</strong>
-    <small>${escapeHtml(p.brand)} · ${escapeHtml(p.variant)}</small>
-    </td>
-    <td>${escapeHtml(p.supplier)}</td>
-    <td class="num">USD ${p.price_usd}</td>
-    <td class="num">${money(p.market_cop)}</td>
-    <td class="num">${money(p.analysis.cost)}</td>
-    <td class="num">${money(p.analysis.price)}</td>
-    <td class="num">${money(p.analysis.profit)}</td>
-    <td class="num">
-    <span class="tag ${p.analysis.eligible ? 'good' : 'bad'}">${percent(p.analysis.margin)}</span>
-    </td>
-    <td>${statusTag(p)}</td>
-    <td>
-    <button class="btn secondary" data-action="review" data-id="${escapeHtml(p.id)}">Examinar</button>
-    </td>
-    </tr>`).join('')}</tbody>
-    </table>
-    </div><div class="pagination"><button class="btn secondary" data-action="admin-page" data-delta="-1" ${state.adminPage===0?'disabled':''}>Anterior</button><span>${rows.length} referencias · página ${state.adminPage+1}</span><button class="btn secondary" data-action="admin-page" data-delta="1" ${(state.adminPage+1)*50>=rows.length?'disabled':''}>Siguiente</button></div>`;
-  }
-  if (state.tab === 'reglas') content = `<div class="split">
-    <form id="settings-form" class="panel">
-    <h3>Reglas de rentabilidad</h3>
-    <div class="settings-grid">${[['fx', 'TRM de referencia (COP/USD)'], ['duty', 'Importación e impuestos (decimal)'], ['fee', 'Comisión de venta (decimal)'], ['market_factor', 'Factor del mercado (decimal)'], ['min_margin', 'Margen mínimo (decimal)'], ['shipping_buffer_cop', 'Colchón logístico (COP)']].map(([key, label]) => `<label>${label}<input name="${key}" type="number" step="any" value="${escapeHtml(s[key])}" required>
-    </label>`).join('')}</div>
-    <label>
-    <input name="auto_publish" type="checkbox" disabled ${s.auto_publish === 'true' ? 'checked' : ''}>Reservado: publicación automática deshabilitada en las cargas de inventario</label>
-    <button class="btn">Guardar reglas</button>
-    </form>
-    <div class="panel">
-    <h3>Cómo se calcula</h3>
-    <p>El precio propuesto es el precio de mercado × factor. Se resta compra convertida a COP, envío, costos de importación, comisión y colchón logístico.</p>
-    <p class="notice">Valores provisionales. Antes de activar publicación automática, validar fuente de mercado, TRM, tributos, garantía y disponibilidad. El 10 % es un supuesto de trabajo.</p>
-    </div>
-    </div>`;
-  if(state.tab==='preparar') content=bulkCatalog();
-  if (state.tab === 'inventario') content = inventory();
-  if (state.tab === 'fuentes') content = `<div class="split">
-    <div class="panel">
-    <h3>Sincronización del proveedor</h3>
-    <p>Para el inventario de Jomashop, usa la pestaña <strong>Importar inventario</strong> y revisa la vista previa XLSX.</p>
-    <p class="muted">El feed CSV configurado en el servidor se conserva para fuentes independientes. No modifica las referencias administradas por Excel ni publica nuevas fichas automáticamente.</p>
-    <button class="btn secondary" data-action="sync">Ejecutar sincronización configurada</button>
-    </div>
-    <div class="panel">
-    <h3>Últimas ejecuciones</h3>
-    <div class="log">${d.jobs.length ? d.jobs.map(j => `<div>
-    <strong>${escapeHtml(j.status)}</strong> · ${escapeHtml(j.source)} · ${j.imported} registros<br>
-    <small>${escapeHtml(j.started_at)} ${escapeHtml(j.error || '')}</small>
-    </div>`).join('') : 'Aún no hay importaciones.'}</div>
-    </div>
-    </div>`;
-  if (state.tab === 'pedidos') content = `<div class="panel">
-    <h3>Solicitudes de prueba</h3>
-    <p class="muted">No se ha integrado la pasarela de pagos. No hay cobros ni reservas de inventario.</p>
-    <div class="log">${d.orders.length ? d.orders.map(o => `<div>
-    <strong>${escapeHtml(o.id)}</strong> · ${money(o.total_cop)} · ${escapeHtml(o.status)}<br>
-    <small>${escapeHtml(o.created_at)}</small>
-    </div>`).join('') : 'No hay solicitudes.'}</div>
-    </div>`;
-  if (state.tab === 'auditoria') content = `<div class="panel">
-    <h3>Actividad reciente</h3>
-    <div class="log">${d.audit.map(a => `<div>
-    <strong>${escapeHtml(a.action)}</strong> · ${escapeHtml(a.subject)}<br>
-    <small>${escapeHtml(a.actor)} · ${escapeHtml(a.created_at)}</small>
-    </div>`).join('')}</div>
-    </div>`;
-  return `<div class="admin-shell">
-    <div class="admin-top">
-    <div>
-    <span class="eyebrow">BACATÁ / OPERACIONES</span>
-    <h1>Centro de control</h1>
-    </div>
-    <button class="btn secondary" data-action="logout">Cerrar sesión</button>
-    </div>
-    <p class="muted">Oportunidades, reglas, fuentes y trazabilidad en un solo lugar.</p>
-    <div class="tabs" role="tablist" aria-label="Secciones administrativas">${[['oportunidades', 'Oportunidades'], ['reglas', 'Reglas'], ['inventario', 'Importar inventario'], ['preparar','Preparar catálogo'], ['fuentes', 'Sincronización'], ['pedidos', 'Pedidos'], ['auditoria', 'Actividad']].map(([key, label]) => `<button role="tab" aria-selected="${state.tab === key}" tabindex="${state.tab === key ? 0 : -1}" aria-controls="admin-tabpanel" class="${state.tab === key ? 'active' : ''}" data-action="tab" data-tab="${key}">${label}</button>`).join('')}</div>
-    <section id="admin-tabpanel" role="tabpanel" aria-label="${escapeHtml(state.tab)}">${content}</section>
-    </div>`;
-}
-function adminDetail(p) {
-  const a = p.analysis;
-  return `<button class="btn secondary" data-action="back">← Todas las oportunidades</button>
-    <div class="admin-detail">
-    <div class="panel">
-    <span class="eyebrow">ANÁLISIS DE REFERENCIA</span>
-    <h2>${escapeHtml(p.brand)} ${escapeHtml(p.name)}</h2>
-    <p>${escapeHtml(p.reference)} · ${escapeHtml(p.variant)} · ${statusTag(p)}</p>${[['Precio proveedor (USD ' + p.price_usd + ')', a.supplier], ['Envío proveedor (USD ' + p.shipping_usd + ')', a.shipping], ['Importación e impuestos estimados', a.importCost], ['Comisión estimada', a.commission], ['Colchón logístico', a.buffer], ['Costo total estimado', a.cost], ['Precio de mercado informado', p.market_cop], ['Venta sugerida', a.suggested??a.price], ['Precio aprobado', p.approved_price_cop??0], ['Contribución estimada', a.profit]].map(([k, v]) => `<div class="breakdown">
-    <span>${k}</span>
-    <strong>${money(v)}</strong>
-    </div>`).join('')}<div class="breakdown emphasis">
-    <span>Margen de contribución</span>
-    <strong>${(a.margin==null?'Sin comparable':percent(a.margin))}</strong>
-    </div>
-    </div>
-    <div class="panel">
-    <h3>Preparación para publicar</h3>
-    ${p.publication_issues?.length ? `<ul class="readiness-list">${p.publication_issues.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>` : '<p class="tag good">Ficha lista para publicar</p>'}
-    <p class="tag ${a.eligible ? 'good' : 'bad'}">${a.eligible ? 'Cumple la regla' : 'No cumple la regla'}</p>
-    <p class="muted">Umbral: ${percent(+state.admin.settings.min_margin)}. Unidades propias: ${p.stock}. Último dato de origen: ${escapeHtml(p.source_updated_at || 'Sin registro')}.</p>
-    <div class="actions">
-    <button class="btn" data-action="status" data-id="${escapeHtml(p.id)}" data-status="published">Publicar</button>
-    <button class="btn secondary" data-action="status" data-id="${escapeHtml(p.id)}" data-status="pending">Dejar pendiente</button>
-    <button class="btn secondary" data-action="status" data-id="${escapeHtml(p.id)}" data-status="paused">Pausar</button>
-    <button class="btn danger" data-action="status" data-id="${escapeHtml(p.id)}" data-status="discarded">Descartar</button>
-    </div>${p.status === 'published' ? `<p>
-    <a href="#/reloj/${encodeURIComponent(p.id)}">Ver en tienda ↗</a>
-    </p>` : ''}<p class="notice">La publicación comprueba la ficha y las condiciones guardadas. Las referencias por cotizar no habilitan compras.</p>
-    <details><summary>Fuentes e historial de campos</summary><button class="btn secondary" data-action="field-history" data-id="${escapeHtml(p.id)}">Consultar procedencia</button><div id="field-history" class="log"></div></details>
-    ${productEditor(p)}
-    </div>
-    </div>`;
+  const selected = d.products.find(p => p.id === state.selected);
+  if (selected) content = `<button class="btn secondary" data-action="back">← Volver</button><h2>${esc(selected.brand)} · ${esc(selected.reference)}</h2>${tag(selected)}<div class="admin-detail">${profitability(selected)}<section class="panel"><h3>Estado de la ficha</h3><p>${esc(selected.pause_reason)}</p><ul>${selected.publication_issues.map(x => `<li>${esc(x)}</li>`).join('')}</ul><div class="actions"><button class="btn secondary" data-action="publication-action" data-command="pause" data-id="${esc(selected.id)}">Pausar</button><button class="btn" data-action="publication-action" data-command="${selected.effective_status === 'requires_confirmation' ? 'confirm' : 'reactivate'}" data-id="${esc(selected.id)}">${selected.effective_status === 'requires_confirmation' ? 'Confirmar y mantener activa' : 'Reactivar'}</button></div><details><summary>Historial de campos</summary><button class="btn secondary" data-action="field-history" data-id="${esc(selected.id)}">Consultar</button><div id="field-history" class="log"></div></details>${productEditor(selected)}</section></div>`;else if (state.tab === 'oportunidades') content = opportunities();else if (state.tab === 'inventario') content = inventory();else if (state.tab === 'fichas') content = catalogImport();else if (state.tab === 'publicaciones') content = publications();else if (state.tab === 'reglas') content = settingsView(d.settings);else if (state.tab === 'auditoria') content = `<section class="panel"><h2>Actividad</h2>${d.audit.map(a => `<div class="breakdown"><span>${esc(a.action)} · ${esc(a.subject)}<small>${esc(a.actor)} · ${esc(a.created_at)}</small></span><details><summary>Detalle</summary><pre>${esc(a.details)}</pre></details></div>`).join('')}</section>`;else if (state.tab === 'pedidos') content = `<section class="panel"><h2>Solicitudes de prueba</h2><p>Pasarela pendiente. Sin cobros ni reservas.</p>${d.orders.map(o => `<p>${esc(o.id)} · ${money(o.total_cop)} · ${esc(o.status)}</p>`).join('') || '<p>Sin solicitudes.</p>'}</section>`;
+  return `<div class="admin-shell"><div class="admin-top"><div><span class="eyebrow">BACATÁ / OPERACIONES</span><h1>Centro de control</h1></div><button class="btn secondary" data-action="logout">Cerrar sesión</button></div><div class="actions workflow-actions"><button class="btn ${state.tab === 'inventario' ? 'active' : ''}" data-action="tab" data-tab="inventario">1 · Importar base en crudo</button><button class="btn ${state.tab === 'fichas' ? 'active' : ''}" data-action="tab" data-tab="fichas">2 · Importar fichas y publicar</button></div><div class="tabs" role="tablist" aria-label="Secciones administrativas">${[['oportunidades', 'Oportunidades'], ['publicaciones', 'Publicaciones'], ['reglas', 'Administración'], ['pedidos', 'Pedidos'], ['auditoria', 'Actividad']].map(([k, l]) => `<button role="tab" aria-selected="${state.tab === k}" tabindex="${state.tab === k ? 0 : -1}" aria-controls="admin-tabpanel" data-action="tab" data-tab="${k}" class="${state.tab === k ? 'active' : ''}">${l}</button>`).join('')}</div><section id="admin-tabpanel" role="tabpanel">${content}</section></div>`;
 }

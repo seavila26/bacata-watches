@@ -1,4 +1,3 @@
-import { productDetails } from './config.js';
 export async function api(path, options = {}) {
   const response = await fetch(path, {
     credentials: 'same-origin',
@@ -24,12 +23,5 @@ export const request = (path, method, body) => api(path, {
   body: JSON.stringify(body)
 });
 export function normalizeProducts(products) {
-  return products.map(product => {
-    const diameter = String(product.variant || '').match(/(\d+(?:\.\d+)?)\s*mm/i);
-    return {
-      ...product,
-      ...(product.is_demo ? productDetails[product.reference] : {}),
-      diameter_mm: product.diameter_mm ?? (product.is_demo ? productDetails[product.reference]?.diameter_mm : null) ?? (diameter ? Number(diameter[1]) : null)
-    };
-  });
+  return products;
 }

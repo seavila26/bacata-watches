@@ -5,8 +5,9 @@ import { money, escapeHtml as esc, safeImage } from './js/utils.js';
 import { art, emptyState } from './js/components.js';
 import { home, catalog, detail, cart, brands, principles, editorial, contact, conditions } from './js/views/store.js';
 import { activeCampaign } from './js/config.js';
-import {filteredBulkProducts} from './js/views/catalog-bulk.js';
-import {filteredPreview} from './js/views/inventory.js';
+import { filteredOpportunities } from './js/views/admin.js';
+import { filteredPublications } from './js/views/publications.js';
+import { filteredPreview } from './js/views/inventory.js';
 import { admin } from './js/views/admin.js';
 const main = document.querySelector('#main');
 const toastEl = document.querySelector('#toast');
@@ -104,7 +105,34 @@ function openDialog(id) {
   document.querySelector(id).showModal();
 }
 function fileBase64(file) {
- return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=()=>reject(Error('No se pudo leer el archivo'));reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.readAsDataURL(file);});
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(Error('No se pudo leer el archivo'));
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.readAsDataURL(file);
+  });
+}
+async function download(path, data, name) {
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    const error = await response.json();
+    throw Error(error.error || 'No se pudo exportar');
+  }
+  const url = URL.createObjectURL(await response.blob()),
+    a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 async function act(button) {
   const {
@@ -112,40 +140,99 @@ async function act(button) {
     id
   } = button.dataset;
   switch (action) {
-    case 'field-history': {
-      const result=await api(`/api/admin/products/${encodeURIComponent(id)}/history`);
-      document.querySelector('#field-history').innerHTML=result.history.map(h=>`<div><strong>${esc(h.field)}</strong>: ${esc(JSON.parse(h.value_json))}<small>${esc(h.method)} · ${esc(h.created_at)} · ${esc(h.source_url||'Edición administrativa')}</small></div>`).join('')||'<p>Aún no hay datos de procedencia registrados.</p>';return;
-    }
-    case 'bulk-select': {
-      const ids=filteredBulkProducts().map(p=>p.id);if(new Set([...state.bulkSelection,...ids]).size>250)throw Error('Selecciona un filtro de máximo 250 referencias');
-      ids.forEach(id=>state.bulkSelection.add(id));state.bulkPlan=null;render();return;
-    }
-    case 'bulk-clear': state.bulkSelection.clear();state.bulkPlan=null;render();return;
-    case 'bulk-page': state.bulkPage+=Number(button.dataset.delta);render();return;
-    case 'proposal-page': state.proposalPage+=Number(button.dataset.delta);render();return;
-    case 'proposal-filter': state.proposalFilter=button.dataset.filter;state.proposalPage=0;render();return;
-    case 'select-proposals': {
-      const proposed=state.admin.bulk.proposals.filter(p=>p.state==='proposed');
-      if(proposed.length>250)throw Error('Revisa primero un lote de hasta 250 propuestas');
-      proposed.forEach(p=>state.proposalSelection.add(p.id));render();return;
-    }
-    case 'clear-proposals': state.proposalSelection.clear();render();return;
-    case 'bulk-review-product': state.tab='oportunidades';state.selected=id;render();return;
-    case 'cancel-enrichment': await request('/api/admin/enrichment/cancel','POST',{id});await refresh();toast('Cancelación solicitada; termina la referencia en curso.');return;
-    case 'apply-bulk': {
-      const result=await request('/api/admin/bulk/apply','POST',{token:state.bulkPlan.token,publish:button.dataset.publish==='true'});
-      state.bulkPlan=null;await refresh();toast(`${result.updated} fichas actualizadas; ${result.published} publicadas; ${result.blocked.length} con pendientes.`);return;
-    }
+    case 'field-history':
+      {
+        const result = await api(`/api/admin/products/${encodeURIComponent(id)}/history`);
+        document.querySelector('#field-history').innerHTML = result.history.map(h => `<div><strong>${esc(h.field)}</strong>: ${esc(JSON.parse(h.value_json))}<small>${esc(h.method)} · ${esc(h.created_at)} · ${esc(h.source_url || 'Edición administrativa')}</small></div>`).join('') || '<p>Aún no hay datos de procedencia registrados.</p>';
+        return;
+      }
+    case 'select-opportunities':
+      filteredOpportunities().forEach(p => state.opportunitySelection.add(p.id));
+      render();
+      return;
+    case 'clear-opportunities':
+      state.opportunitySelection.clear();
+      render();
+      return;
+    case 'select-publications':
+      filteredPublications().forEach(p => state.publicationSelection.add(p.id));
+      render();
+      return;
+    case 'clear-publications':
+      state.publicationSelection.clear();
+      render();
+      return;
+    case 'publication-page':
+      state.publicationPage += Number(button.dataset.delta);
+      render();
+      return;
+    case 'export-opportunities':
+      return download('/api/admin/catalog/export', {
+        ids: state.opportunitySelection.size ? [...state.opportunitySelection] : filteredOpportunities().map(p => p.id)
+      }, 'plantilla-fichas.xlsx');
+    case 'export-import':
+      return download('/api/admin/catalog/export', {
+        token: state.importPreview.token,
+        selection: state.importSelection.size ? [...state.importSelection] : filteredPreview().filter(r => r.reference && r.brand).map(r => r.index)
+      }, 'plantilla-fichas.xlsx');
+    case 'export-publications':
+      return download('/api/admin/publications/export', {
+        ids: state.publicationSelection.size ? [...state.publicationSelection] : filteredPublications().map(p => p.id)
+      }, 'publicaciones.xlsx');
+    case 'export-pending':
+      return download('/api/admin/catalog/pending', {
+        token: state.catalogResult.report_token
+      }, 'pendientes-fichas.xlsx');
+    case 'commit-catalog':
+      state.catalogResult = await request('/api/admin/catalog/commit', 'POST', {
+        token: state.catalogPreview.token
+      });
+      state.catalogPreview = null;
+      await refresh();
+      toast('Fichas guardadas. Revisa el resumen de publicación.');
+      return;
+    case 'publication-action':
+      {
+        const result = await request('/api/admin/publications/action', 'POST', {
+          ids: id ? [id] : [...state.publicationSelection],
+          action: button.dataset.command
+        });
+        await refresh();
+        toast(`${result.results.filter(r => r.ok).length} actualizadas. ${result.results.filter(r => !r.ok).map(r => r.id + ': ' + r.issues.join('; ')).join(' · ')}`);
+        return;
+      }
     case 'select-import':
-      filteredPreview().filter(r=>!r.errors.length).forEach(r=>state.importSelection.add(r.index));render();return;
-    case 'clear-import': state.importSelection.clear();render();return;
-    case 'import-page': state.importPage+=Number(button.dataset.delta);render();return;
-    case 'admin-page': state.adminPage+=Number(button.dataset.delta);render();return;
-    case 'commit-import': {
-      const result=await request('/api/admin/inventory/commit','POST',{token:state.importPreview.token,selection:[...state.importSelection]});
-      state.importPreview=null;state.importSelection.clear();state.tab='oportunidades';state.adminPage=0;state.adminQuery='';state.adminStatus='';
-      await refresh();toast(`${result.created} nuevas, ${result.updated} actualizadas y ${result.paused} pausadas.`);return;
-    }
+      filteredPreview().filter(r => !r.errors.length).forEach(r => state.importSelection.add(r.index));
+      render();
+      return;
+    case 'clear-import':
+      state.importSelection.clear();
+      render();
+      return;
+    case 'import-page':
+      state.importPage += Number(button.dataset.delta);
+      render();
+      return;
+    case 'admin-page':
+      state.adminPage += Number(button.dataset.delta);
+      render();
+      return;
+    case 'commit-import':
+      {
+        const result = await request('/api/admin/inventory/commit', 'POST', {
+          token: state.importPreview.token,
+          selection: [...state.importSelection]
+        });
+        state.importPreview = null;
+        state.importSelection.clear();
+        state.tab = 'oportunidades';
+        state.adminPage = 0;
+        state.adminQuery = '';
+        state.adminStatus = '';
+        await refresh();
+        toast(`${result.created} nuevas, ${result.updated} actualizadas y ${result.paused} pausadas.`);
+        return;
+      }
     case 'retry':
       return route();
     case 'search':
@@ -160,9 +247,9 @@ async function act(button) {
     case 'add':
       {
         const p = state.products.find(p => p.id === id);
-        if (!p || p.stock < 1) throw Error('Esta referencia no está disponible.');
+        if (!p || !(p.price_cop > 0)) throw Error('Esta referencia no está disponible.');
         const quantity = state.cart[id] || 0;
-        if (quantity >= Math.min(10, p.stock)) throw Error('Ya alcanzaste la disponibilidad mostrada para esta pieza.');
+        if (quantity >= 10) throw Error('Ya alcanzaste la límite de 10 piezas por solicitud.');
         state.cart[id] = quantity + 1;
         saveCart();
         toast('Pieza añadida a tu bolsa.');
@@ -197,21 +284,6 @@ async function act(button) {
       state.admin = null;
       render();
       return;
-    case 'sync':
-      {
-        const result = await request('/api/admin/sync', 'POST', {});
-        await refresh();
-        toast(`${result.imported} referencias sincronizadas.`);
-        return;
-      }
-    case 'status':
-      {
-        const p = state.admin.products.find(x => x.id === id);
-        await request(`/api/admin/products/${encodeURIComponent(id)}/status`, 'PATCH', {status: button.dataset.status});
-        await refresh();
-        toast('Decisión guardada.');
-        return;
-      }
     case 'zoom':
       {
         const p = state.products.find(x => x.id === id);
@@ -258,7 +330,7 @@ document.addEventListener('click', async event => {
   if (button.dataset.busy) return;
   button.dataset.busy = 'true';
   const wasDisabled = button.disabled;
-  if (['sync', 'status', 'order', 'logout','commit-import','apply-bulk','cancel-enrichment'].includes(button.dataset.action)) button.disabled = true;
+  if (['publication-action', 'order', 'logout', 'commit-import', 'commit-catalog'].includes(button.dataset.action)) button.disabled = true;
   try {
     await act(button);
   } catch (error) {
@@ -270,28 +342,57 @@ document.addEventListener('click', async event => {
 });
 document.addEventListener('change', async event => {
   const input = event.target;
-  if(input.dataset.bulkId) {
-    if(input.checked&&state.bulkSelection.size>=250){input.checked=false;toast('Máximo 250 referencias por lote');return;}
-    if(input.checked)state.bulkSelection.add(input.dataset.bulkId);else state.bulkSelection.delete(input.dataset.bulkId);state.bulkPlan=null;render();return;
+  if (input.dataset.opportunityId) {
+    if (input.checked) state.opportunitySelection.add(input.dataset.opportunityId);else state.opportunitySelection.delete(input.dataset.opportunityId);
+    render();
+    return;
   }
-  if(input.dataset.proposalId){if(input.checked)state.proposalSelection.add(input.dataset.proposalId);else state.proposalSelection.delete(input.dataset.proposalId);render();return;}
-  if(input.dataset.importIndex!==undefined){const index=Number(input.dataset.importIndex);if(input.checked)state.importSelection.add(index);else state.importSelection.delete(index);render();return;}
-  if(input.dataset.upload) {
-    const uploadForm=input.closest('form');
-    if(uploadForm.dataset.uploading){toast('Espera a que termine la carga de fotografías.');input.value='';return;}
-    uploadForm.dataset.uploading='true';input.disabled=true;
+  if (input.dataset.publicationId) {
+    if (input.checked) state.publicationSelection.add(input.dataset.publicationId);else state.publicationSelection.delete(input.dataset.publicationId);
+    render();
+    return;
+  }
+  if (input.dataset.importIndex !== undefined) {
+    const index = Number(input.dataset.importIndex);
+    if (input.checked) state.importSelection.add(index);else state.importSelection.delete(index);
+    render();
+    return;
+  }
+  if (input.dataset.upload) {
+    const uploadForm = input.closest('form');
+    if (uploadForm.dataset.uploading) {
+      toast('Espera a que termine la carga de fotografías.');
+      input.value = '';
+      return;
+    }
+    uploadForm.dataset.uploading = 'true';
+    input.disabled = true;
     try {
-      const form=input.closest('form'),files=[...input.files];
-      const additional=form.elements.images.value.split('\n').map(x=>x.trim()).filter(Boolean);
-      if(input.dataset.upload==='gallery'&&additional.length+files.length>8)throw Error('Máximo ocho fotos adicionales');
-      for(const file of files) {
-        if(file.size>5*1024*1024)throw Error('Cada foto debe pesar máximo 5 MB');
-        const result=await request('/api/admin/images','POST',{base64:await fileBase64(file)});
-        if(input.dataset.upload==='main') {form.elements.image_url.value=result.url;document.querySelector('#editor-image-preview').innerHTML=`<img src="${esc(result.url)}" alt="Nueva fotografía principal">`;}
-        else {additional.push(result.url);form.elements.images.value=additional.join('\n');}
+      const form = input.closest('form'),
+        files = [...input.files];
+      const additional = form.elements.images.value.split('\n').map(x => x.trim()).filter(Boolean);
+      if (input.dataset.upload === 'gallery' && additional.length + files.length > 8) throw Error('Máximo ocho fotos adicionales');
+      for (const file of files) {
+        if (file.size > 5 * 1024 * 1024) throw Error('Cada foto debe pesar máximo 5 MB');
+        const result = await request('/api/admin/images', 'POST', {
+          base64: await fileBase64(file)
+        });
+        if (input.dataset.upload === 'main') {
+          form.elements.image_url.value = result.url;
+          document.querySelector('#editor-image-preview').innerHTML = `<img src="${esc(result.url)}" alt="Nueva fotografía principal">`;
+        } else {
+          additional.push(result.url);
+          form.elements.images.value = additional.join('\n');
+        }
       }
       toast('Fotografías subidas. Guarda la ficha para vincularlas.');
-    }catch(e){toast(e.message);}finally{delete uploadForm.dataset.uploading;input.disabled=false;input.value='';}
+    } catch (e) {
+      toast(e.message);
+    } finally {
+      delete uploadForm.dataset.uploading;
+      input.disabled = false;
+      input.value = '';
+    }
     return;
   }
   if (input.id === 'brand' || input.dataset.filter) {
@@ -303,8 +404,8 @@ document.addEventListener('change', async event => {
   if (input.dataset.qty) {
     const n = Number(input.value);
     const p = state.products.find(p => p.id === input.dataset.qty);
-    if (!Number.isInteger(n) || n < 1 || n > Math.min(10, p?.stock || 0)) {
-      toast('Cantidad fuera de la disponibilidad mostrada.');
+    if (!Number.isInteger(n) || n < 1 || n > (p ? 10 : 0)) {
+      toast('Cantidad inválida (1 a 10).');
       render();
       return;
     }
@@ -313,10 +414,6 @@ document.addEventListener('change', async event => {
   }
 });
 document.addEventListener('input', event => {
-  if(event.target.dataset.proposalEdit) {
-    const id=event.target.dataset.proposalEdit,key=event.target.dataset.field;
-    state.proposalEdits[id]??={};state.proposalEdits[id][key]=key==='diameter_mm'?(event.target.value===''?null:Number(event.target.value)):event.target.value;return;
-  }
   if (event.target.id !== 'search') return;
   const position = event.target.selectionStart;
   state.filters.q = event.target.value;
@@ -327,42 +424,64 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['login', 'settings-form', 'import-form', 'product-form', 'global-search','inventory-form','preview-filter','admin-filter','bulk-filter','enrichment-form','bulk-plan-form','proposal-review-form','template-form','authorized-catalog-form'].includes(form.id)) return;
+  if (!['login', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
   event.preventDefault();
-  if(form.dataset.uploading){toast('Espera a que termine la carga de fotografías antes de guardar.');return;}
+  if (form.dataset.uploading) {
+    toast('Espera a que termine la carga de fotografías antes de guardar.');
+    return;
+  }
   const submit = form.querySelector('button[type="submit"], button:not([type])');
   if (submit?.disabled) return;
   if (submit) submit.disabled = true;
   try {
-    if(form.id==='bulk-filter'){state.bulkFilter=form.elements.mode.value;state.bulkQuery=form.elements.query.value.trim();state.bulkPage=0;render();}
-    if(form.id==='enrichment-form'){
-      const ids=[...state.bulkSelection];const scope=event.submitter?.value;
-      const result=await request('/api/admin/enrichment/start','POST',{ids:scope==='pilot'?ids.slice(0,10):ids,download_images:form.elements.download_images.checked,use_ai:form.elements.use_ai.checked});
-      await refresh();toast(`Lote iniciado: ${result.total} referencias. Puedes seguir trabajando.`);
+    if (form.id === 'catalog-form') {
+      const file = form.elements.file.files[0];
+      if (!file || file.size > 15 * 1024 * 1024 || !file.name.toLowerCase().endsWith('.xlsx')) throw Error('Selecciona un XLSX de máximo 15 MB');
+      state.catalogPreview = await api('/api/admin/catalog/preview', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/octet-stream'
+        },
+        body: await fileBase64(file)
+      });
+      state.catalogResult = null;
+      render();
     }
-    if(form.id==='bulk-plan-form'){
-      state.bulkPlan=await request('/api/admin/bulk/preview','POST',{ids:[...state.bulkSelection],template_id:form.elements.template_id.value,approve_suggested:form.elements.approve_suggested.checked,overwrite:form.elements.overwrite.checked,confirm_costs:form.elements.confirm_costs.checked,confirm_supplier:form.elements.confirm_supplier.checked});render();
+    if (form.id === 'publication-filter') {
+      state.publicationFilter = Object.fromEntries(new FormData(form));
+      state.publicationPage = 0;
+      render();
     }
-    if(form.id==='proposal-review-form'){
-      const ids=[...state.proposalSelection];const edits=Object.fromEntries(ids.filter(id=>state.proposalEdits[id]).map(id=>[id,state.proposalEdits[id]]));
-      const result=await request('/api/admin/enrichment/apply','POST',{ids,edits});state.proposalSelection.clear();state.proposalEdits={};state.bulkPlan=null;await refresh();toast(`${result.applied} propuestas aplicadas. Revisa las condiciones antes de publicar.`);
+    if (form.id === 'inventory-form') {
+      const file = form.elements.file.files[0];
+      if (!file || file.size > 15 * 1024 * 1024 || !file.name.toLowerCase().endsWith('.xlsx')) throw Error('Selecciona un XLSX de máximo 15 MB');
+      state.importPreview = await api('/api/admin/inventory/preview', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/octet-stream'
+        },
+        body: await fileBase64(file)
+      });
+      state.importSelection.clear();
+      state.importPage = 0;
+      state.importFilter = 'launch';
+      state.importQuery = '';
+      render();
+      toast('Vista previa lista. El catálogo todavía no ha cambiado.');
     }
-    if(form.id==='template-form'){
-      const data=Object.fromEntries(new FormData(form));const name=data.name;delete data.name;
-      await request('/api/admin/templates','POST',{name,fields:Object.fromEntries(Object.entries(data).filter(([,v])=>v.trim()))});await refresh();toast('Plantilla guardada.');
+    if (form.id === 'preview-filter') {
+      state.importFilter = form.elements.group.value;
+      state.importQuery = form.elements.query.value.trim();
+      state.importPage = 0;
+      render();
     }
-    if(form.id==='authorized-catalog-form'){
-      const file=form.elements.file.files[0];if(!file||file.size>4*1024*1024)throw Error('Catálogo JSON de máximo 4 MB');
-      const records=JSON.parse(await file.text());
-      const result=await request('/api/admin/enrichment/catalog','POST',{records:Array.isArray(records)?records:records.records,download_images:form.elements.download_images.checked,use_ai:false});await refresh();toast(`${result.total} propuestas preparadas desde el catálogo.`);
+    if (form.id === 'admin-filter') {
+      state.adminQuery = form.elements.query.value.trim();
+      state.adminStatus = form.elements.status.value;
+      state.opportunityFilter = form.elements.group.value;
+      state.adminPage = 0;
+      render();
     }
-    if(form.id==='inventory-form') {
-      const file=form.elements.file.files[0];if(!file||file.size>15*1024*1024||!file.name.toLowerCase().endsWith('.xlsx'))throw Error('Selecciona un XLSX de máximo 15 MB');
-      state.importPreview=await api('/api/admin/inventory/preview',{method:'POST',headers:{'content-type':'application/octet-stream'},body:await fileBase64(file)});
-      state.importSelection.clear();state.importPage=0;state.importFilter='all';state.importQuery='';render();toast('Vista previa lista. El catálogo todavía no ha cambiado.');
-    }
-    if(form.id==='preview-filter'){state.importFilter=form.elements.group.value;state.importQuery=form.elements.query.value.trim();state.importPage=0;render();}
-    if(form.id==='admin-filter'){state.adminQuery=form.elements.query.value.trim();state.adminStatus=form.elements.status.value;state.adminPage=0;render();}
     if (form.id === 'global-search') {
       state.filters.q = form.elements.query.value.trim();
       document.querySelector('#search-dialog').close();
@@ -375,33 +494,19 @@ document.addEventListener('submit', async event => {
     }
     if (form.id === 'settings-form') {
       const data = Object.fromEntries(new FormData(form));
-      data.auto_publish = form.elements.auto_publish.checked;
+      for (const key of ['duty', 'fee', 'logistics_rate', 'discount', 'min_margin']) data[key] = Number(data[key]) / 100;
+      data.fx = Number(data.fx);
       await request('/api/admin/settings', 'PUT', data);
       await refresh();
       toast('Reglas guardadas.');
     }
     if (form.id === 'product-form') {
       const data = Object.fromEntries(new FormData(form));
-      for(const key of ['market_cop','stock','approved_price_cop','manual_cost_cop','diameter_mm'])if(key in data)data[key]=data[key]===''&&['approved_price_cop','manual_cost_cop','diameter_mm'].includes(key)?null:Number(data[key]);
-      data.cost_verified=form.elements.cost_verified.checked;
-      if(form.elements.confirm_supplier.checked)data.confirm_supplier=true;else delete data.confirm_supplier;
-      data.images=data.images.split('\n').map(x=>x.trim()).filter(Boolean);
+      for (const key of ['approved_price_cop', 'diameter_mm']) if (key in data) data[key] = data[key] === '' && ['approved_price_cop', 'diameter_mm'].includes(key) ? null : Number(data[key]);
+      data.images = data.images.split('\n').map(x => x.trim()).filter(Boolean);
       await request(`/api/admin/products/${encodeURIComponent(form.dataset.id)}`, 'PATCH', data);
       await refresh();
       toast('Ficha actualizada.');
-    }
-    if (form.id === 'import-form') {
-      const file = form.elements.file.files[0];
-      if (!file || file.size > 5 * 1024 * 1024) throw Error('Selecciona un CSV de máximo 5 MB.');
-      const result = await api('/api/admin/import', {
-        method: 'POST',
-        headers: {
-          'content-type': 'text/csv'
-        },
-        body: await file.text()
-      });
-      await refresh();
-      toast(`${result.imported} referencias importadas.`);
     }
   } catch (error) {
     toast(error.message);
@@ -444,18 +549,3 @@ document.addEventListener('error', event => {
     container.innerHTML = '<span class="image-error">Imagen no disponible. Consulta la referencia antes de decidir.</span>';
   }
 }, true);
-
-// Refresh operational progress without interrupting an in-progress review edit.
-let bulkPolling=false,bulkNeedsRender=false;
-setInterval(async()=>{
- if(bulkPolling||document.hidden||state.tab!=='preparar'||!state.admin||!currentRoute().path.startsWith('/admin'))return;
- bulkPolling=true;
- try {
-  const data=await api('/api/admin/bulk');
-  const changed=JSON.stringify(data)!==JSON.stringify(state.admin.bulk);
-  state.admin.bulk=data;
-  if(changed)bulkNeedsRender=true;
-  if(bulkNeedsRender&&!document.activeElement?.closest('input,textarea,select')){const y=scrollY;render();scrollTo(0,y);bulkNeedsRender=false;}
- }catch(e){if(!state.admin)return;}
- finally{bulkPolling=false;}
-},4000);

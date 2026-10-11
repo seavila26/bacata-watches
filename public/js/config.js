@@ -6,8 +6,7 @@ export const brand = {
   // Completar con los canales comerciales validados antes de publicar.
   contactEmail: '',
   whatsapp: '',
-  address: '',
-  catalogIsDemo: true
+  address: ''
 };
 
 /** Una campaña a la vez. Fechas con offset Colombia (-05:00).
@@ -48,13 +47,3 @@ export const articles = [{
   intro: 'La belleza atrae. La información decide.',
   paragraphs: ['Una fotografía amplia ayuda a reconocer proporciones. Las imágenes de esfera, caja, correa y cierre permiten observar acabados y entender la pieza.', 'No confundas una ilustración de campaña con una fotografía de la referencia que vas a recibir. En una ficha de venta, el modelo, la variante y el estado deben corresponder al reloj ofrecido.', 'La procedencia, la documentación disponible y el alcance de la garantía merecen la misma atención que el diseño. Para una compra de mayor valor, pide revisión individual de esos puntos.']
 }];
-
-/** Fichas complementarias validadas, indexadas por referencia exacta.
- * Mientras el backend no exponga estos campos, se pueden completar aquí.
- * Dejar vacío todo dato no verificado. Ejemplo de estructura (sin activar):
- * 'REF-EXACTA': { movement: '...', diameter_mm: 40, style: '...',
- *   condition: '...', material: '...', warranty: '...', package_contents: '...',
- *   provenance: '...', shipping_terms: '...', images: ['/assets/productos/...webp'] }
- * En producción conviene administrar esta información desde la base de datos.
- */
-export const productDetails = {};

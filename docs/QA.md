@@ -1,23 +1,24 @@
-# Verificación frontend v0.3
+# Validación del flujo simplificado
 
-## Navegador
+`npm test` ejecuta pruebas con bases SQLite temporales y credenciales de prueba; no modifica una instalación comercial.
 
-Pruebas con Chromium sin interfaz, API real de la aplicación y base SQLite temporal de prueba. Revisión visual de capturas de portada escritorio/móvil, login, panel, decisión y ficha.
+Cobertura:
 
-- Inicio y catálogo: 320, 375, 768, 1024, 1440 px; sin desborde horizontal del documento.
-- Administración, Marcas, Cómo elegimos, Editorial, Contacto y Condiciones: mismos cinco tamaños; sin desborde del documento.
-- La tabla administrativa mantiene scroll interno para conservar la lectura de cifras.
-- Sin errores JavaScript ni violaciones de CSP en el recorrido final.
-- Fuentes locales Caladea y Noto Sans cargadas y comprobadas mediante FontFaceSet.
-- Icono → palabra Bolsa: 8 px. Palabra → contador: 10 px; verificación de rectángulos DOM.
-- Campo contraseña → botón Ingresar: 32 px.
-- Acceso administrativo, tabla, revisión y formulario de edición cargados.
-- Búsqueda sin resultados y restablecimiento funcionales.
-- Ficha, ampliación con diálogo, cierre con Escape y añadir a bolsa funcionales.
-- Bolsa, aceptación de condiciones y creación de solicitud de prueba verificadas.
-- Menú móvil, navegación a editorial y cierre de diálogo al cambiar de ruta verificados.
-- Sintaxis JS de módulos comprobada.
+- Clave exacta con normalización de mayúsculas/espacios y conservación de puntuación.
+- Análisis de base y de fichas sin escritura; duplicados y errores de fórmula.
+- Parámetros globales, desglose que suma al costo, comparable y prioridad del precio aprobado.
+- Exportación con 16 columnas y 55 referencias, incluyendo todas las páginas.
+- Vacíos que conservan datos; actualizaciones parciales de imágenes; rechazo de referencias inexistentes.
+- Publicación automática, motivos de borrador y pausa por margen.
+- Recargas que conservan contenido y pausas manuales; ausencia de referencias sin borrado.
+- Regla de más de 72 horas, confirmación y bloqueo de compra vencida.
+- API pública con lista explícita de campos comprobada contra productos publicados reales de prueba.
+- Acciones individuales y masivas, exportación de publicaciones y condiciones globales.
+- Concurrencia, reversión completa y bloqueo de vistas previas con reglas cambiadas.
+- Migración desde esquema anterior preservando productos, fotos, precios aprobados, pedidos e historial.
+- Autenticación, origen, imágenes inválidas y eliminación de endpoints anteriores.
+- Renderizado de las cuatro vistas y selección persistente entre páginas.
 
-## Límites
+El flujo HTTP inicia un servidor real, importa 55 oportunidades y publica cuatro fichas de prueba. Las pruebas de frontend verifican filtros y HTML generado; no equivalen a una revisión visual en navegador. Chromium no está instalado en este entorno, por lo que no se han generado nuevas capturas ni validado visualmente todos los tamaños de pantalla.
 
-No constituye auditoría WCAG completa ni pruebas en todos los dispositivos físicos. No se probaron pagos, proveedores externos ni ventas reales. Los filtros de movimiento y estilo requieren datos técnicos aprobados; se deshabilitan explícitamente si no existen. Los estados bajo pedido/por cotizar/agotado están preparados en frontend pero la API actual solo entrega publicados con stock positivo.
+La pasarela de pagos no forma parte de este cambio. No se consultan proveedores externos ni se descargan fotografías. Los datos de ejemplo son ficticios.

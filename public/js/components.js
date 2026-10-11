@@ -46,28 +46,10 @@ export function emptyState(title, message, action = '') {
     <p>${escapeHtml(message)}</p>${action}</div>`;
 }
 export function productAvailability(p) {
-  if (p.availability === 'quote') return {
-    key: 'quote',
-    label: 'Por cotizar',
-    action: 'Consultar esta pieza',
-    buy: false
-  };
-  if (p.availability === 'on_order') return {
-    key: 'on_order',
-    label: 'Bajo pedido',
-    action: 'Consultar pedido',
-    buy: false
-  };
-  if (p.stock <= 0 || p.availability === 'sold_out') return {
-    key: 'sold_out',
-    label: 'Agotado',
-    action: 'Consultar disponibilidad',
-    buy: false
-  };
   return {
     key: 'available',
     label: 'Disponible',
     action: 'Añadir a la bolsa',
-    buy: true
+    buy: p.price_cop > 0
   };
 }

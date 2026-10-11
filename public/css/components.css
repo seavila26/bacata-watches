@@ -19,8 +19,6 @@
 .demo-note { display: block; margin-top: 20px; font-size: 12px; color: var(--gray); }
 .availability { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--success); }
 .availability::before { content: ''; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
-.availability--on_order, .availability--quote { color: var(--warning); }
-.availability--sold_out { color: var(--gray); }
 .tag { display: inline-flex; align-items: center; padding: 4px 8px; border: 1px solid #afb6bf; color: var(--gray); border-radius: 3px; font-size: 12px; white-space: nowrap; }
 .tag.good { color: var(--success); background: #edf5ef; border-color: #adcbb7; }
 .tag.bad { color: var(--error); background: #fff0ef; border-color: #d9aaaa; }
