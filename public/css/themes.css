@@ -34,3 +34,6 @@
 [data-theme="dark"] .campaign--christmas, [data-theme="dark"] .campaign--friendship, [data-theme="dark"] .campaign--black-friday { background: var(--surface-soft); }
 [data-theme="dark"] .campaign--christmas .hero__content h1, [data-theme="dark"] .campaign--friendship .hero__content h1 { color: var(--ink); }
 [data-theme="dark"] .header-action:hover { color: #D9E2F0; }
+
+/* Keep the compact header logo backing proportional; footer artwork is unchanged. */
+[data-theme="dark"] .site-header .logo img { padding: 4px; }

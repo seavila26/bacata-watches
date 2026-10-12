@@ -1,7 +1,7 @@
 /* Private operations: navigation, overview, reference review and import tools. */
 .is-admin main { background: var(--operational-bg); }
 .admin-shell { display: grid; grid-template-columns: 224px minmax(0,1fr); gap: 32px; max-width: 1440px; padding: 32px 32px 64px; margin: auto; align-items: start; }
-.admin-sidebar { background: var(--blue); color: #FFF; border-radius: 8px; padding: 24px 12px 16px; position: sticky; top: 200px; max-height: calc(100vh - 220px); overflow-y: auto; }
+.admin-sidebar { background: var(--blue); color: #FFF; border-radius: 8px; padding: 24px 12px 16px; position: sticky; top: 96px; max-height: calc(100vh - 112px); overflow-y: auto; }
 .sidebar-heading { display: flex; align-items: center; gap: 12px; padding: 0 12px 24px; }
 .sidebar-symbol { border: 1px solid #61718A; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; color: #FFF; flex-shrink: 0; }
 .sidebar-heading strong { font: 400 24px var(--serif); display: block; }

@@ -25,6 +25,13 @@
 - Confirmación de vigencia visible en referencias activas, acceso a publicaciones después de importar fichas y mejor separación de formularios.
 - Sin cambios de backend, dependencias, inventarios ni fórmula. Validación descrita en `QA-EXPERIENCIA.md`.
 
+## Encabezado compacto · 12 octubre 2026
+
+- Barra superior de aproximadamente 82 px en escritorio y 75 px en móvil, en lugar del encabezado alto con logo de 180 px.
+- Navegación y acciones en una sola fila, conservando áreas táctiles de al menos 44 px.
+- Logo original contenido sin recortar; márgenes del modo oscuro ajustados a la barra.
+- Posición fija del menú administrativo alineada con la nueva altura.
+
 ## Versiones anteriores
 
 v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorporó importación XLSX y editor persistente. v0.5 incorporó un flujo de preparación de catálogo que esta versión reemplaza por completo.

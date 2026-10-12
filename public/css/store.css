@@ -1,8 +1,9 @@
 .announcement { background: var(--blue); color: white; text-align: center; padding: 10px 20px; font-size: 11px; letter-spacing: .12em; }
 .announcement span { margin: 0 16px; color: #b9c5d7; }
-.site-header { width: min(100%,1440px); margin: auto; padding: 12px 32px; display: grid; grid-template-columns: 180px 1fr auto; align-items: center; gap: 32px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.site-header { width: min(100%,1440px); margin: auto; padding: 6px 32px; display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
 .logo { display: block; flex-shrink: 0; }
 .logo img { display: block; width: 180px; height: auto; }
+.site-header .logo img { width: 80px; height: 69px; object-fit: contain; }
 .desktop-nav { display: flex; justify-content: center; flex-wrap: wrap; column-gap: 24px; row-gap: 8px; }
 .desktop-nav a { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; color: var(--ink); text-decoration: none; position: relative; }
 .desktop-nav a::after { content: ''; position: absolute; left: 0; right: 0; bottom: 4px; height: 1px; background: var(--brass); transform: scaleX(0); transition: transform var(--transition); }

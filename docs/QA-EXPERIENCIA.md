@@ -25,3 +25,7 @@ Las capturas en `previews/experience/` muestran datos de prueba, no inventario n
 ## Revisión manual adicional antes de producción
 
 Validar el resultado con las fotografías autorizadas definitivas y las referencias reales. Revisar Safari/iOS y lector de pantalla: esta sesión comprobó Chromium y teclado, no una certificación completa de accesibilidad. Las condiciones comerciales y la pasarela siguen pendientes del alcance de producción.
+
+## Corrección del encabezado · 12 octubre 2026
+
+Chromium, SQLite temporal y datos vacíos: 20 verificaciones del encabezado (cinco anchos × dos temas × inicio/desplazamiento a 600 px). Altura medida: 82 px en 1024/1440 y 75 px en 320/375/768, igual en ambos temas. Sin desbordamientos de página; controles visibles con altura mínima de 44 px. En administración, al desplazarse: borde inferior del encabezado a 82 px y menú lateral a 96 px. Acceso, búsqueda y cierre con Escape comprobados; sin errores JavaScript.
