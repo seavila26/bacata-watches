@@ -132,3 +132,9 @@ th { position: sticky; top: 0; } .table-wrap { border-radius: 8px; }
 .commercial-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
 .commercial-fields__wide { grid-column: 1 / -1; }
 @media (max-width: 640px) { .commercial-fields { grid-template-columns: 1fr; } }
+
+.order-detail-grid { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr); gap:24px; align-items:start; }
+@media (max-width:900px) { .order-detail-grid { grid-template-columns:minmax(0,1fr); } }
+
+.order-table-hint { display:none; }
+@media (max-width:640px) { .order-table-hint { display:block; color:var(--muted); font-size:12px; } }

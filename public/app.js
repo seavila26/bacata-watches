@@ -108,6 +108,11 @@ async function route() {
       if (sequence !== routeSequence) return;
       state.admin = data;
       if (data) state.commercial = data.commercial;
+      if (data && state.tab === 'pedidos') {
+        state.selectedOrder = null;
+        await loadOrders();
+        if (sequence !== routeSequence) return;
+      }
     } else {
       const [data, profile] = await Promise.all([api('/api/products'), api('/api/commercial')]);
       if (sequence !== routeSequence) return;
@@ -125,11 +130,18 @@ async function route() {
     main.innerHTML = `<section class="wrap">${emptyState('La selección no pudo cargarse.', error.message, '<button class="btn" data-action="retry">Reintentar</button>')}</section>`;
   }
 }
+async function loadOrders() {
+  const query = new URLSearchParams(state.orderFilter);
+  const data = await api('/api/admin/orders?' + query.toString());
+  state.orderList = data;
+  state.orderFilter.page = data.page;
+}
 async function refresh() {
   const [products, operations] = await Promise.all([api('/api/products'), api('/api/admin/overview')]);
   state.products = normalizeProducts(products.products);
   state.admin = operations;
   state.commercial = operations.commercial;
+  if (state.tab === 'pedidos') await loadOrders();
   render();
 }
 function openDialog(id) {
@@ -191,10 +203,24 @@ async function act(button) {
       state.tab = button.dataset.tab;
       state.selected = null;
       history.pushState(null, '', `#/admin/${state.tab}`);
+      if (state.tab === 'pedidos') { state.selectedOrder = null; await loadOrders(); }
       render();
       document.querySelector('#admin-tabpanel')?.focus({ preventScroll: true });
       enterView(document.querySelector('#admin-tabpanel'));
       return;
+    case 'order-open':
+      state.selectedOrder = (await api('/api/admin/orders/' + encodeURIComponent(id))).order;
+      render();
+      document.querySelector('#order-review-form')?.focus({ preventScroll: true });
+      return;
+    case 'order-back':
+      state.selectedOrder = null; await loadOrders(); render(); return;
+    case 'order-clear':
+      state.orderFilter = { q:'', status:'', page:1 }; await loadOrders(); render(); return;
+    case 'order-status-filter':
+      state.orderFilter = { q:'', status:button.dataset.status, page:1 }; await loadOrders(); render(); return;
+    case 'order-page':
+      state.orderFilter.page += Number(button.dataset.delta); await loadOrders(); render(); return;
     case 'remove-filter':
       if (button.dataset.filterKey in state.filters) state.filters[button.dataset.filterKey] = '';
       syncCatalogLocation();
@@ -490,7 +516,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['login', 'commercial-form', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
+  if (!['login', 'order-filter', 'order-review-form', 'commercial-form', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
   event.preventDefault();
   if (form.dataset.uploading) {
     toast('Espera a que termine la carga de fotografías antes de guardar.');
@@ -559,7 +585,18 @@ document.addEventListener('submit', async event => {
     if (form.id === 'login') {
       await request('/api/admin/login', 'POST', Object.fromEntries(new FormData(form)));
       state.admin = await api('/api/admin/overview');
+      state.commercial = state.admin.commercial;
+      if (state.tab === 'pedidos') await loadOrders();
       render();
+    }
+    if (form.id === 'order-filter') {
+      state.orderFilter = { ...Object.fromEntries(new FormData(form)), page:1 };
+      await loadOrders(); render();
+    }
+    if (form.id === 'order-review-form') {
+      const data = { ...Object.fromEntries(new FormData(form)), version:Number(form.dataset.version) };
+      state.selectedOrder = (await request('/api/admin/orders/' + encodeURIComponent(form.dataset.id), 'PATCH', data)).order;
+      await refresh(); toast('Seguimiento guardado.');
     }
     if (form.id === 'commercial-form') {
       const data = Object.fromEntries(new FormData(form));
@@ -590,7 +627,7 @@ document.addEventListener('submit', async event => {
     if (submit) submit.disabled = false;
   }
 });
-document.addEventListener('keydown', event => {
+document.addEventListener('keydown', async event => {
   const tab = event.target.closest('.tabs [role="tab"]');
   if (!tab || !['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
   event.preventDefault();
@@ -602,6 +639,11 @@ document.addEventListener('keydown', event => {
   state.tab = key;
   state.selected = null;
   history.replaceState(null, '', `#/admin/${key}`);
+  if (key === 'pedidos') {
+    state.selectedOrder = null;
+    try { await loadOrders(); } catch (error) { toast(error.message); }
+    if (state.tab !== key) return;
+  }
   render();
   document.querySelector(`.tabs [data-tab="${key}"]`).focus();
 });

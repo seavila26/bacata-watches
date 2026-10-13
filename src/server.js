@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { requestList, requestDetail, reviewRequest } from './orders.js';
 import { commercialProfile, saveCommercial } from './commercial.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
@@ -194,6 +195,10 @@ async function handler(req, res) {
     if (path.startsWith('/api/admin/')) {
       if (!guard(req, res)) return;
       if (method !== 'GET' && !csrf(req, res)) return;
+      if (path === '/api/admin/orders' && method === 'GET') return json(res, 200, requestList(u.searchParams));
+      const orderRoute = path.match(/^\/api\/admin\/orders\/([^/]+)$/);
+      if (orderRoute && method === 'GET') return json(res, 200, { order: requestDetail(decodeURIComponent(orderRoute[1])) });
+      if (orderRoute && method === 'PATCH') return json(res, 200, { order: reviewRequest(decodeURIComponent(orderRoute[1]), await readJson(req, 32768), email) });
       if (path === '/api/admin/overview' && method === 'GET') {
         const rows = db.prepare('SELECT * FROM products ORDER BY updated_at DESC').all().map(p => decorate(p));
         const jobs = db.prepare('SELECT * FROM jobs ORDER BY id DESC LIMIT 10').all();

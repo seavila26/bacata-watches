@@ -64,6 +64,8 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
       }
     }).then(r => r.json());
     assert.equal((await fetch(base + '/api/admin/overview')).status, 401);
+    assert.equal((await fetch(base + '/api/admin/orders')).status, 401);
+    assert.equal((await fetch(base + '/api/admin/orders/AUR-private')).status, 401);
     assert.equal((await send('/api/admin/commercial', commercialDefaults, 'PUT')).status, 401);
     assert.equal((await get('/api/commercial')).commercial.whatsapp, '573246871623');
     assert.equal((await send('/api/admin/catalog/export', {
@@ -97,6 +99,15 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
     assert.deepEqual(JSON.parse(persistedProfile.prepare('SELECT data_json FROM commercial_profile WHERE id=1').get().data_json), commercial);
     persistedProfile.close();
 
+    const requestDb = new DatabaseSync(dbPath);
+    requestDb.prepare('INSERT INTO orders(id,items_json,total_cop,created_at) VALUES(?,?,?,?)').run('AUR-review-test', JSON.stringify([{id:'old',reference:'OLD-01',name:'Pieza previa',quantity:1,unit_price_cop:123456}]),123456,new Date().toISOString());
+    requestDb.close();
+    const savedRequest = (await get('/api/admin/orders/AUR-review-test')).order;
+    assert.equal((await get('/api/admin/orders?q=OLD-01')).total,1);
+    assert.equal((await send('/api/admin/orders/AUR-review-test',{version:savedRequest.version,status:'reviewed',admin_note:'Validada'},'PATCH')).status,200);
+    assert.equal((await send('/api/admin/orders/AUR-review-test',{version:savedRequest.version,status:'archived',admin_note:''},'PATCH')).status,409);
+    assert.equal((await get('/api/admin/orders/AUR-review-test')).order.admin_note,'Validada');
+    assert.equal((await get('/api/products')).orders,undefined);
     const preview = await (await raw('/api/admin/inventory/preview', await fixture({
       count: 55
     }))).json();

@@ -66,3 +66,9 @@ v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorpo
 - Sección privada para editar contacto, identidad legal, envíos, garantía, cambios y privacidad.
 - Persistencia SQLite, auditoría, validación y lectura pública; textos provisionales iniciales sin identificaciones ficticias.
 - Las condiciones públicas usan los valores guardados; guardar no altera rentabilidad ni publicaciones.
+
+## Seguimiento de solicitudes — 2026-10-13
+
+- Listado completo paginado con filtros y detalle de artículos/precios históricos.
+- Estados internos y notas privadas auditadas, con control de concurrencia.
+- Conserva las solicitudes existentes; no habilita pagos, reservas ni envíos.
