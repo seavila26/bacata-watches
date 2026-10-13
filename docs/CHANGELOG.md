@@ -72,3 +72,10 @@ v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorpo
 - Listado completo paginado con filtros y detalle de artículos/precios históricos.
 - Estados internos y notas privadas auditadas, con control de concurrencia.
 - Conserva las solicitudes existentes; no habilita pagos, reservas ni envíos.
+
+## Wompi sandbox — 2026-10-13
+
+- Checkout alojado con precio calculado en servidor, firma, expiración e idempotencia.
+- Consulta privada de transacciones, eventos firmados y cotejo de referencia/monto/moneda.
+- Estado de prueba en retorno y solicitudes; conserva la bolsa hasta confirmación de su intento.
+- Desactivado por defecto; acepta únicamente claves sandbox. Cobros reales pendientes.

@@ -1,4 +1,6 @@
 import http from 'node:http';
+import { quoteItems } from './order-quote.js';
+import { paymentConfig, createCheckout, paymentState, verifyPayment, receiveEvent } from './wompi.js';
 import { requestList, requestDetail, reviewRequest } from './orders.js';
 import { commercialProfile, saveCommercial } from './commercial.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -30,6 +32,8 @@ const loginLimits = new RateLimiter({ limit: 10, windowMs: 15 * 60000 });
 const globalLoginLimit = new RateLimiter({ limit: 60, windowMs: 60000 });
 const orderLimits = new RateLimiter({ limit: 20, windowMs: 10 * 60000 });
 const globalOrderLimit = new RateLimiter({ limit: 120, windowMs: 60000 });
+const paymentVerifyLimits = new RateLimiter({ limit:20, windowMs:60000 });
+const globalPaymentLimit = new RateLimiter({ limit:120, windowMs:60000 });
 let loginWorkers = 0;
 function limited(req, res, perAddress, global) {
   const result = perAddress.consume(clientAddress(req, trustProxy));
@@ -149,6 +153,22 @@ async function handler(req, res) {
     if (path === '/api/admin/session' && method === 'GET') return json(res, 200, {
       authenticated: auth(req)
     });
+    if (path === '/api/payments/config' && method === 'GET') return json(res,200,{mode:paymentConfig.mode,enabled:paymentConfig.enabled});
+    if (path === '/api/payments/wompi/events' && method === 'POST') {
+      if (limited(req,res,paymentVerifyLimits,globalPaymentLimit)) return;
+      return json(res,200,await receiveEvent(await readJson(req,65536),req.headers['x-event-checksum']));
+    }
+    if (path === '/api/payments/checkout' && method === 'POST') {
+      if (!csrf(req,res) || limited(req,res,orderLimits,globalOrderLimit)) return;
+      return json(res,201,createCheckout(await readJson(req,16384),origin));
+    }
+    const paymentRoute = path.match(/^\/api\/payments\/([a-f0-9]{64})(\/verify)?$/);
+    if (paymentRoute && !paymentRoute[2] && method === 'GET') return json(res,200,{payment:paymentState(paymentRoute[1])});
+    if (paymentRoute?.[2] && method === 'POST') {
+      if (!csrf(req,res) || limited(req,res,paymentVerifyLimits,globalPaymentLimit)) return;
+      const data=await readJson(req,1024);
+      return json(res,200,{payment:await verifyPayment(paymentRoute[1],data.transaction_id)});
+    }
     if (path === '/api/commercial' && method === 'GET') return json(res, 200, { commercial: commercialProfile() });
     if (path === '/api/products' && method === 'GET') {
       const rows = db.prepare("SELECT * FROM products WHERE status='published' ORDER BY updated_at DESC").all().filter(p => isVisible(p)).map(p => publicProduct(p, calculate(p), settings()));
@@ -160,26 +180,7 @@ async function handler(req, res) {
       if (!csrf(req, res)) return;
       if (limited(req, res, orderLimits, globalOrderLimit)) return;
       const d = await readJson(req, 16384);
-      if (!Array.isArray(d.items) || d.items.length < 1 || d.items.length > 20) return error(res, 400, 'Carrito inválido');
-      let total = 0;
-      const items = [];
-      for (const item of d.items) {
-        if (!item || typeof item.id !== 'string' || item.id.length > 200) return error(res, 400, 'Carrito inválido');
-        const quantity = +item.quantity;
-        if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) return error(res, 400, 'Cantidad inválida');
-        const p = db.prepare("SELECT * FROM products WHERE id=? AND status='published'").get(item.id);
-        if (!p || !isVisible(p)) return error(res, 409, 'Producto no disponible');
-        const price = calculate(p).price;
-        if (price <= 0) return error(res, 409, 'Precio no disponible');
-        total += price * quantity;
-        items.push({
-          id: p.id,
-          reference: p.reference,
-          name: p.name,
-          quantity,
-          unit_price_cop: price
-        });
-      }
+      const { total, items } = quoteItems(d.items);
       const id = 'AUR-' + randomBytes(5).toString('hex').toUpperCase();
       db.prepare('INSERT INTO orders(id,items_json,total_cop,created_at) VALUES(?,?,?,?)').run(id, JSON.stringify(items), total, new Date().toISOString());
       audit('customer', 'order_created', id, {
@@ -205,6 +206,7 @@ async function handler(req, res) {
         return json(res, 200, {
           products: rows,
           commercial: commercialProfile(),
+          payments: {mode:paymentConfig.mode,enabled:paymentConfig.enabled},
           settings: settings(),
           jobs,
           orders: db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 30').all(),
@@ -351,7 +353,7 @@ async function handler(req, res) {
       return error(res, 404, 'Ruta no encontrada');
     }
     if (path.startsWith('/api/')) return error(res, 404, 'Ruta no encontrada');
-    const f = path === '/' ? 'index.html' : path.slice(1);
+    const f = path === '/' || path === '/pago' ? 'index.html' : path.slice(1);
     if (!/^(index\.html|app\.js|style\.css|(?:js|css|assets|uploads)\/[a-zA-Z0-9_/-]+\.(?:js|css|png|jpg|jpeg|webp|svg|woff))$/.test(f)) return error(res, 404, 'No encontrado');
     const data = await readFile(resolve('public', f));
     res.writeHead(200, {

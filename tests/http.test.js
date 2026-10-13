@@ -64,6 +64,9 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
       }
     }).then(r => r.json());
     assert.equal((await fetch(base + '/api/admin/overview')).status, 401);
+    assert.deepEqual(await get('/api/payments/config'), {mode:'disabled',enabled:false});
+    assert.equal((await send('/api/payments/checkout',{items:[{id:'p',quantity:1}],accepted:true,idempotency_key:'a'.repeat(64)})).status,503);
+    assert.equal((await fetch(base+'/pago?token=not-secret')).status,200);
     assert.equal((await fetch(base + '/api/admin/orders')).status, 401);
     assert.equal((await fetch(base + '/api/admin/orders/AUR-private')).status, 401);
     assert.equal((await send('/api/admin/commercial', commercialDefaults, 'PUT')).status, 401);

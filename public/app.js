@@ -1,4 +1,5 @@
 /** Entry point. Routing and events only; templates live in js/views. */
+import { paymentView } from './js/views/payments.js';
 import { state } from './js/state.js';
 import { api, request, normalizeProducts } from './js/api.js';
 import { money, escapeHtml as esc, safeImage } from './js/utils.js';
@@ -13,6 +14,7 @@ import { enhanceView, enterView, toggleTheme } from './js/experience.js';
 const main = document.querySelector('#main');
 const toastEl = document.querySelector('#toast');
 let routeSequence = 0;
+let paymentPoll;
 function toast(message, link = '') {
   toastEl.textContent = message;
   if (link) {
@@ -64,7 +66,8 @@ function render() {
     '/contacto': () => contact(query.get('reference') || ''),
     '/condiciones': conditions,
     '/garantia': warranty,
-    '/privacidad': privacy
+    '/privacidad': privacy,
+    '/pago': paymentView
   };
   main.innerHTML = path.startsWith('/admin') ? admin() : path.startsWith('/reloj/') ? detail(path.slice(7)) : path.startsWith('/editorial/') ? editorial(path.slice(11)) : views[path] ? views[path]() : `<section class="wrap">${emptyState('No encontramos esta página.', 'Vuelve al inicio para seguir explorando.', '<a class="btn" href="#/">Volver al inicio</a>')}</section>`;
   document.querySelectorAll('.desktop-nav a').forEach(a => {
@@ -80,6 +83,7 @@ function loading() {
   main.innerHTML = '<section class="wrap loading-state" role="status" aria-label="Cargando selección"><span class="eyebrow">BACATÁ</span><div class="skeleton skeleton-title"></div><div class="skeleton-grid"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div><p>Preparando la selección…</p></section>';
 }
 async function route() {
+  clearTimeout(paymentPoll);
   const sequence = ++routeSequence;
   document.querySelectorAll('dialog[open]').forEach(d => d.close());
   clearTimeout(toast.timer);
@@ -107,19 +111,25 @@ async function route() {
       const data = session.authenticated ? await api('/api/admin/overview') : null;
       if (sequence !== routeSequence) return;
       state.admin = data;
-      if (data) state.commercial = data.commercial;
+      if (data) { state.commercial = data.commercial; state.paymentConfig = data.payments; }
       if (data && state.tab === 'pedidos') {
         state.selectedOrder = null;
         await loadOrders();
         if (sequence !== routeSequence) return;
       }
     } else {
-      const [data, profile] = await Promise.all([api('/api/products'), api('/api/commercial')]);
+      const [data, profile, payments] = await Promise.all([api('/api/products'), api('/api/commercial'), api('/api/payments/config')]);
       if (sequence !== routeSequence) return;
       state.products = normalizeProducts(data.products);
       state.commercial = profile.commercial;
+      state.paymentConfig = payments;
+      if (path === '/pago') {
+        await refreshPayment();
+        if (sequence !== routeSequence) return;
+      }
     }
     render();
+    if (path === '/pago') pollPayment(sequence);
     scrollTo(0, 0);
     enterView(main);
     main.focus({
@@ -129,6 +139,49 @@ async function route() {
     if (sequence !== routeSequence) return;
     main.innerHTML = `<section class="wrap">${emptyState('La selección no pudo cargarse.', error.message, '<button class="btn" data-action="retry">Reintentar</button>')}</section>`;
   }
+}
+function paymentToken() {
+  return currentRoute().query.get('token') || new URLSearchParams(location.search).get('token') || '';
+}
+async function refreshPayment() {
+  state.paymentError = '';
+  const token = paymentToken();
+  const source = new URLSearchParams(location.search);
+  const transaction = source.get('token') === token ? source.get('id') : '';
+  if (transaction) {
+    try { await request('/api/payments/' + encodeURIComponent(token) + '/verify','POST',{transaction_id:transaction}); }
+    catch(error) { state.paymentError = error.message; }
+  }
+  state.paymentResult = (await api('/api/payments/' + encodeURIComponent(token))).payment;
+  const status = state.paymentResult.status;
+  if (status !== 'PENDING') {
+    let checkout;
+    try { checkout = JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null'); } catch {}
+    if (status === 'APPROVED' && checkout?.token === token && checkout?.cart === JSON.stringify(Object.entries(state.cart).map(([id,quantity])=>({id,quantity})))) {
+      state.cart = {}; saveCart();
+    }
+    if (checkout?.token === token) {
+      try { sessionStorage.removeItem('bacata-checkout'); } catch {}
+    }
+  }
+}
+function pollPayment(sequence, attempt = 0) {
+  if (state.paymentResult?.status !== 'PENDING' || attempt >= 8) return;
+  paymentPoll = setTimeout(async () => {
+    if (sequence !== routeSequence || currentRoute().path !== '/pago') return;
+    try { await refreshPayment(); } catch(error) { state.paymentError = error.message; }
+    if (sequence !== routeSequence || currentRoute().path !== '/pago') return;
+    render(); pollPayment(sequence, attempt + 1);
+  }, 15000);
+}
+function checkoutKey(items) {
+  const cart = JSON.stringify(items);
+  let existing;
+  try { existing = JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null'); } catch {}
+  if (existing?.cart === cart && /^[a-f0-9]{64}$/.test(existing.key)) return existing.key;
+  const key = [...crypto.getRandomValues(new Uint8Array(32))].map(x=>x.toString(16).padStart(2,'0')).join('');
+  try { sessionStorage.setItem('bacata-checkout',JSON.stringify({cart,key})); } catch {}
+  return key;
 }
 async function loadOrders() {
   const query = new URLSearchParams(state.orderFilter);
@@ -141,6 +194,7 @@ async function refresh() {
   state.products = normalizeProducts(products.products);
   state.admin = operations;
   state.commercial = operations.commercial;
+  state.paymentConfig = operations.payments;
   if (state.tab === 'pedidos') await loadOrders();
   render();
 }
@@ -387,6 +441,32 @@ async function act(button) {
         document.querySelectorAll('.gallery-thumbs button').forEach(b => b.setAttribute('aria-pressed', b === button));
         return;
       }
+    case 'payment-refresh':
+      await refreshPayment(); render(); return;
+    case 'pay':
+      {
+        if (!document.querySelector('#accept-terms')?.checked) throw Error('Lee y acepta las condiciones de prueba para continuar.');
+        const items = Object.entries(state.cart).map(([id,quantity])=>({id,quantity}));
+        let result;
+        try { result = await request('/api/payments/checkout','POST',{items,accepted:true,idempotency_key:checkoutKey(items)}); }
+        catch(error) {
+          let previous;
+          try { previous = JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null'); } catch {}
+          if (error.status === 409 && /^[a-f0-9]{64}$/.test(previous?.token || '')) {
+            location.hash = '#/pago?token=' + previous.token;
+            return;
+          }
+          throw error;
+        }
+        try {
+          const previous = JSON.parse(sessionStorage.getItem('bacata-checkout') || '{}');
+          sessionStorage.setItem('bacata-checkout',JSON.stringify({...previous,token:result.token}));
+        } catch {}
+        const url = new URL(result.checkout_url);
+        if (url.origin !== 'https://checkout.wompi.co') throw Error('Dirección de pago inválida');
+        location.assign(url.href);
+        return;
+      }
     case 'order':
       {
         if (!document.querySelector('#accept-terms')?.checked) throw Error('Lee y acepta las condiciones de la demostración para continuar.');
@@ -586,6 +666,7 @@ document.addEventListener('submit', async event => {
       await request('/api/admin/login', 'POST', Object.fromEntries(new FormData(form)));
       state.admin = await api('/api/admin/overview');
       state.commercial = state.admin.commercial;
+      state.paymentConfig = state.admin.payments;
       if (state.tab === 'pedidos') await loadOrders();
       render();
     }
@@ -649,6 +730,7 @@ document.addEventListener('keydown', async event => {
 });
 addEventListener('hashchange', route);
 saveCart();
+if (location.pathname === '/pago') history.replaceState(null,'',location.pathname + location.search + '#/pago');
 route();
 
 // Campaigns expire automatically even when the homepage remains open.

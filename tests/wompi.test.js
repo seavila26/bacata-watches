@@ -1,0 +1,88 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { state } from '../public/js/state.js';
+import { paymentView } from '../public/js/views/payments.js';
+test('sandbox checkout signs server prices, verifies private API, rejects forged events and handles retries without duplicate orders', async () => {
+  const dir=await mkdtemp(join(tmpdir(),'bacata-wompi-'));
+  process.env.DB_PATH=join(dir,'test.sqlite'); process.env.SEED_DEMO='false'; process.env.WOMPI_MODE='disabled';
+  const {db}=await import('../src/db.js');
+  const {wompiConfig,createCheckout,integritySignature,validateEvent,receiveEvent,verifyPayment,paymentState}=await import('../src/wompi.js');
+  const config=wompiConfig({WOMPI_MODE:'sandbox',WOMPI_PUBLIC_KEY:'pub_test_fixture',WOMPI_PRIVATE_KEY:'prv_test_fixture',WOMPI_INTEGRITY_SECRET:'test_integrity_fixture',WOMPI_EVENTS_SECRET:'test_events_fixture'});
+  const sign=event=>{let text='';for(const property of event.signature.properties){let value=event.data;for(const key of property.split('.'))value=value[key];text+=String(value);}event.signature.checksum=createHash('sha256').update(text+event.timestamp+config.eventsSecret).digest('hex');return event;};
+  const makeEvent=(tx)=>sign({event:'transaction.updated',environment:'test',timestamp:Math.floor(Date.now()/1000),data:{transaction:tx},signature:{properties:['transaction.amount_in_cents','transaction.id','transaction.status']}});
+  try {
+    assert.throws(()=>wompiConfig({WOMPI_MODE:'production'}), /cobros reales/);
+    assert.throws(()=>wompiConfig({WOMPI_MODE:'sandbox',WOMPI_PUBLIC_KEY:'pub_prod_wrong'}), /WOMPI_PUBLIC_KEY/);
+    const now=new Date().toISOString();
+    db.prepare(`INSERT INTO products(id,identity_key,brand,reference,name,price_usd,market_cop,status,updated_at,last_confirmed_at,published_at,collection,movement,diameter_mm,material,crystal,water_resistance,dial_color,strap,image_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('p1','fixture','Bulova','98B428','Racer',100,2000000,'published',now,now,now,'Racer','Cuarzo',40,'Acero','Zafiro','100 metros','Negro','Acero','https://example.com/watch.webp');
+    const input={items:[{id:'p1',quantity:2}],accepted:true,idempotency_key:'a'.repeat(64)};
+    assert.throws(()=>createCheckout(input,'https://example.com',{enabled:false}), e=>e.status===503);
+    assert.throws(()=>createCheckout({...input,amount_in_cents:1},'https://example.com',config), e=>e.status===400);
+    assert.throws(()=>createCheckout({...input,accepted:false},'https://example.com',config), e=>e.status===400);
+    assert.throws(()=>createCheckout({...input,items:[...input.items,...input.items]},'https://example.com',config), e=>e.status===400);
+    const checkout=createCheckout(input,'https://example.com',config), url=new URL(checkout.checkout_url);
+    assert.equal(url.origin,'https://checkout.wompi.co'); assert.equal(url.searchParams.get('public-key'),config.publicKey);
+    assert.equal(Number(url.searchParams.get('amount-in-cents')),388000000);
+    assert.equal(url.searchParams.get('signature:integrity'),integritySignature(checkout.reference,388000000,'COP',checkout.expires_at,config.integritySecret));
+    assert.ok(!checkout.checkout_url.includes(config.privateKey)); assert.ok(!checkout.checkout_url.includes(config.integritySecret));
+    assert.equal(createCheckout(input,'https://example.com',config).reference,checkout.reference);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,1);
+    assert.throws(()=>createCheckout({...input,items:[{id:'p1',quantity:1}]},'https://example.com',config),e=>e.status===409);
+    const tx={id:'tx-approved',reference:checkout.reference,status:'APPROVED',amount_in_cents:388000000,currency:'COP',payment_method_type:'CARD'};
+    let calls=0;
+    const fetcher=async(url,options)=>{calls++;assert.equal(url,'https://sandbox.wompi.co/v1/transactions/tx-approved');assert.equal(options.headers.Authorization,'Bearer '+config.privateKey);return {ok:true,json:async()=>({data:tx})};};
+    assert.throws(()=>validateEvent({...makeEvent(tx),environment:'prod'},'',config),e=>e.status===401);
+    assert.throws(()=>validateEvent(makeEvent(tx),'0'.repeat(64),config),e=>e.status===401);
+    const forged=makeEvent(tx);forged.data.transaction={...tx,status:'DECLINED'};
+    assert.throws(()=>validateEvent(forged,'',config),e=>e.status===401);
+    const wrong=async()=>({ok:true,json:async()=>({data:{...tx,amount_in_cents:1}})});
+    await assert.rejects(verifyPayment(checkout.token,tx.id,config,wrong),e=>e.status===409);
+    assert.equal(paymentState(checkout.token).status,'PENDING');
+    const wrongCurrency=async()=>({ok:true,json:async()=>({data:{...tx,currency:'USD'}})});
+    await assert.rejects(verifyPayment(checkout.token,tx.id,config,wrongCurrency),e=>e.status===409);
+    const wrongRef=async()=>({ok:true,json:async()=>({data:{...tx,reference:'OTHER'}})});
+    await assert.rejects(verifyPayment(checkout.token,tx.id,config,wrongRef),e=>e.status===409);
+    // Event body fields outside its signature are never taken as payment proof.
+    const event=makeEvent({...tx,reference:'FORGED_REFERENCE',currency:'USD'});
+    await receiveEvent(event,'',config,fetcher);
+    assert.equal(paymentState(checkout.token).status,'APPROVED');
+    const auditCount=db.prepare("SELECT COUNT(*) AS n FROM audit WHERE action='sandbox_payment_verified'").get().n;
+    await receiveEvent(event,'',config,fetcher);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM audit WHERE action='sandbox_payment_verified'").get().n,auditCount);
+    assert.equal((await verifyPayment(checkout.token,tx.id,config,fetcher)).status,'APPROVED');
+    assert.ok(calls>=3);
+    const stale=async()=>({ok:true,json:async()=>({data:{...tx,status:'PENDING'}})});
+    assert.equal((await verifyPayment(checkout.token,tx.id,config,stale)).status,'APPROVED');
+    const unavailable=async()=>({ok:false,status:404});
+    await assert.rejects(verifyPayment(checkout.token,tx.id,config,unavailable),e=>e.status===503);
+    assert.equal(paymentState(checkout.token).status,'APPROVED');
+    assert.throws(()=>createCheckout(input,'https://example.com',config),e=>e.status===409);
+    const key2={...input,idempotency_key:'b'.repeat(64)};
+    db.prepare("UPDATE products SET status='paused' WHERE id='p1'").run();
+    assert.throws(()=>createCheckout(key2,'https://example.com',config),e=>e.status===409);
+    assert.equal(db.prepare('SELECT COUNT(*) AS n FROM orders').get().n,1);
+    assert.equal(db.prepare('SELECT status FROM orders').get().status,'payment_pending');
+    db.prepare("UPDATE products SET status='published' WHERE id='p1'").run();
+    for(const [index,status] of ['DECLINED','ERROR','VOIDED'].entries()) {
+      const attempt=createCheckout({...input,idempotency_key:String(index+1).repeat(64)},'https://example.com',config);
+      const resultTx={...tx,id:'tx-'+status,reference:attempt.reference,status};
+      const mock=async()=>({ok:true,json:async()=>({data:resultTx})});
+      assert.equal((await verifyPayment(attempt.token,resultTx.id,config,mock)).status,status);
+      assert.equal(paymentState(attempt.token).status,status);
+    }
+    const voidFetcher=async()=>({ok:true,json:async()=>({data:{...tx,status:'VOIDED'}})});
+    assert.equal((await verifyPayment(checkout.token,tx.id,config,voidFetcher)).status,'VOIDED');
+    assert.equal((await verifyPayment(checkout.token,tx.id,config,fetcher)).status,'VOIDED');
+    const expiry=createCheckout({...input,idempotency_key:'c'.repeat(64)},'https://example.com',config);
+    db.prepare('UPDATE payment_attempts SET expires_at=? WHERE reference=?').run('2020-01-01T00:00:00Z',expiry.reference);
+    assert.throws(()=>createCheckout({...input,idempotency_key:'c'.repeat(64)},'https://example.com',config),e=>e.status===409);
+
+    assert.equal(Object.keys(paymentState(checkout.token)).some(k=>/note|items|token|key|secret/.test(k)),false);
+    assert.throws(()=>paymentState('guessed'),e=>e.status===404);
+    const prev=state.paymentResult;state.paymentResult=paymentState(checkout.token);assert.ok(paymentView().includes('Anulado'));state.paymentResult=prev;
+  } finally {db.close();await rm(dir,{recursive:true,force:true});}
+});
