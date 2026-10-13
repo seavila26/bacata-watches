@@ -3,7 +3,7 @@ import { state } from './js/state.js';
 import { api, request, normalizeProducts } from './js/api.js';
 import { money, escapeHtml as esc, safeImage } from './js/utils.js';
 import { art, emptyState } from './js/components.js';
-import { home, catalog, detail, cart, brands, principles, editorial, contact, conditions } from './js/views/store.js';
+import { home, catalog, detail, cart, brands, principles, editorial, contact, conditions, warranty } from './js/views/store.js';
 import { activeCampaign } from './js/config.js';
 import { filteredOpportunities } from './js/views/admin.js';
 import { filteredPublications } from './js/views/publications.js';
@@ -62,7 +62,8 @@ function render() {
     '/como-elegimos': principles,
     '/editorial': editorial,
     '/contacto': () => contact(query.get('reference') || ''),
-    '/condiciones': conditions
+    '/condiciones': conditions,
+    '/garantia': warranty
   };
   main.innerHTML = path.startsWith('/admin') ? admin() : path.startsWith('/reloj/') ? detail(path.slice(7)) : path.startsWith('/editorial/') ? editorial(path.slice(11)) : views[path] ? views[path]() : `<section class="wrap">${emptyState('No encontramos esta página.', 'Vuelve al inicio para seguir explorando.', '<a class="btn" href="#/">Volver al inicio</a>')}</section>`;
   document.querySelectorAll('.desktop-nav a').forEach(a => {

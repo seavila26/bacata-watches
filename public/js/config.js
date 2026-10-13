@@ -5,7 +5,9 @@ export const brand = {
   primaryLogo: '/assets/bacata-logo.png',
   // Completar con los canales comerciales validados antes de publicar.
   contactEmail: '',
-  whatsapp: '',
+  whatsapp: '573246871623',
+  whatsappLabel: '+57 324 687 1623',
+  shippingCoverage: 'Colombia',
   address: ''
 };
 

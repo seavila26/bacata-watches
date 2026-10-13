@@ -54,3 +54,9 @@
 ## Versiones anteriores
 
 v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorporó importación XLSX y editor persistente. v0.5 incorporó un flujo de preparación de catálogo que esta versión reemplaza por completo.
+
+## Contacto y garantía — 2026-10-13
+
+- WhatsApp con consulta por referencia y cobertura Colombia.
+- Página de garantía conectada desde fichas, contacto y pie; distingue cobertura del proveedor y derechos en Colombia.
+- Identificación legal y condiciones de venta siguen pendientes; no se habilitan cobros.

@@ -136,6 +136,9 @@
 .article-end { border-top: 1px solid var(--line); padding-top: 32px; margin-top: 48px; }
 .contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; }
 .contact-grid p { color: var(--muted); }
+.contact-grid .btn { margin-block: 8px 20px; }
+.contact-grid .text-link { display: flex; width: fit-content; margin-top: 20px; }
+.article .product-accordion p { color: var(--muted); line-height: 1.8; }
 .confirmation { max-width: 824px; }
 .confirmation .panel { margin: 32px 0; }
 .campaign--christmas { background: #edf0e8; }
