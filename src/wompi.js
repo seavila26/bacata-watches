@@ -1,4 +1,5 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHmac, createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { checkoutCustomer, checkCustomerDestination, storeCustomer, deliveryPromise } from './checkout-customer.js';
 import { db, audit } from './db.js';
 import { quoteDelivery, assertTotal, storeDelivery, deliveryDetails } from './shipping.js';
 import { httpError } from './security.js';
@@ -29,7 +30,11 @@ export function integritySignature(reference,amount,currency,expiration,secret) 
   return sha(reference+String(amount)+currency+expiration+secret);
 }
 function requireEnabled(config) {if(!config.enabled)throw httpError(503,'Wompi está pendiente de configuración en el servidor');}
-function publicAttempt(row) {const delivery=deliveryDetails(row.reference);return {subtotal_cop:delivery?.subtotal_cop ?? row.amount_in_cents/100,shipping_cop:delivery?.shipping_cop ?? null,reference:row.reference,total_cop:row.amount_in_cents/100,currency:row.currency,status:row.status,environment:row.environment,transaction_id:row.transaction_id,updated_at:row.updated_at,expires_at:row.expires_at};}
+function publicAttempt(row) {
+ const delivery=deliveryDetails(row.reference);
+ const order=db.prepare('SELECT items_json FROM orders WHERE id=?').get(row.reference);
+ return {reference:row.reference,total_cop:row.amount_in_cents/100,subtotal_cop:delivery?.subtotal_cop ?? row.amount_in_cents/100,shipping_cop:delivery?.shipping_cop ?? null,currency:row.currency,status:row.status,environment:row.environment,transaction_id:row.transaction_id,updated_at:row.updated_at,expires_at:row.expires_at,city:delivery?.city || null,delivery_terms:deliveryPromise(row.reference),items:order?JSON.parse(order.items_json):[]};
+}
 export function paymentSummary(reference) {
   const row=db.prepare('SELECT * FROM payment_attempts WHERE reference=?').get(reference);
   return row ? publicAttempt(row) : null;
@@ -49,12 +54,14 @@ function checkoutResult(row,origin,config) {
 }
 export function createCheckout(input,origin,config=paymentConfig) {
   requireEnabled(config);
-  if(Object.keys(input).some(key=>!['items','accepted','idempotency_key','destination','expected_total_cop'].includes(key)))throw httpError(400,'Campo de pago no permitido');
+  if(Object.keys(input).some(key=>!['items','accepted','idempotency_key','destination','expected_total_cop','customer','privacy_accepted'].includes(key)))throw httpError(400,'Campo de pago no permitido');
   if(input.accepted!==true||typeof input.idempotency_key!=='string'||!/^[a-f0-9]{64}$/.test(input.idempotency_key))throw httpError(400,'Acepta las condiciones y vuelve a preparar el pago');
   if(!Array.isArray(input.items)||!input.items.length||input.items.length>20)throw httpError(400,'Carrito inválido');
+  const customer=checkoutCustomer(input.customer,input.privacy_accepted);
   const quote=quoteDelivery(input.items,input.destination);
+  checkCustomerDestination(customer,quote.destination);
   assertTotal(input.expected_total_cop,quote);
-  const cart=JSON.stringify({items:input.items.map(item=>({id:item?.id,quantity:item?.quantity})).sort((a,b)=>String(a.id).localeCompare(String(b.id))),destination:quote.destination});
+  const cart=JSON.stringify({items:input.items.map(item=>({id:item?.id,quantity:item?.quantity})).sort((a,b)=>String(a.id).localeCompare(String(b.id))),destination:quote.destination,customer_hash:createHmac('sha256',config.integritySecret).update(JSON.stringify(customer)).digest('hex')});
   const existing=db.prepare('SELECT * FROM payment_attempts WHERE idempotency_key=?').get(input.idempotency_key);
   if(existing) {
     if(existing.cart_json!==cart||existing.environment!=='test')throw httpError(409,'La selección cambió. Prepara un nuevo pago.');
@@ -70,6 +77,7 @@ export function createCheckout(input,origin,config=paymentConfig) {
   try {
     db.prepare('INSERT INTO orders(id,items_json,total_cop,created_at) VALUES(?,?,?,?)').run(reference,JSON.stringify(quote.items),quote.total,now);
     storeDelivery(reference,quote);
+    storeCustomer(reference,customer);
     db.prepare('INSERT INTO payment_attempts(reference,token,idempotency_key,cart_json,amount_in_cents,environment,created_at,updated_at,expires_at) VALUES(?,?,?,?,?,?,?,?,?)').run(reference,token,input.idempotency_key,cart,quote.total*100,'test',now,now,expiration);
     audit('customer','sandbox_checkout_created',reference,{amount_in_cents:quote.total*100,environment:'test'});
     db.exec('COMMIT');

@@ -1,4 +1,6 @@
 /** Entry point. Routing and events only; templates live in js/views. */
+import { checkoutView, checkoutSteps } from './js/views/checkout.js';
+import { validateCustomer, customerDestination } from './js/checkout-model.js';
 import { shippingEstimate } from './js/shipping-model.js';
 import { paymentView } from './js/views/payments.js';
 import { state } from './js/state.js';
@@ -61,6 +63,7 @@ function render() {
     '/': home,
     '/catalogo': catalog,
     '/carrito': cart,
+    '/datos': checkoutView,
     '/marcas': brands,
     '/como-elegimos': principles,
     '/editorial': editorial,
@@ -178,8 +181,9 @@ function pollPayment(sequence, attempt = 0) {
 function saveDestination() {
   try { sessionStorage.setItem('bacata-destination',JSON.stringify(state.shippingDestination)); } catch {}
 }
-function checkoutKey(items, destination, total) {
+function checkoutKey(items, destination, total, customer) {
   const cart = JSON.stringify(items);
+  // La clave de reintento no guarda contacto ni dirección en el navegador.
   const context = JSON.stringify({destination,total});
   let existing;
   try { existing = JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null'); } catch {}
@@ -452,57 +456,7 @@ async function act(button) {
       }
     case 'payment-refresh':
       await refreshPayment(); render(); return;
-    case 'pay':
-      {
-        if (state.shippingDestination.zone === 'national' && !document.querySelector('#shipping-city')?.reportValidity()) return;
-        if (!document.querySelector('#accept-terms')?.checked) throw Error('Lee y acepta las condiciones de prueba para continuar.');
-        const items = Object.entries(state.cart).map(([id,quantity])=>({id,quantity}));
-        const destination = { ...state.shippingDestination };
-        const quote = await request('/api/shipping/quote','POST',{items,destination});
-        const estimate = state.products.reduce((sum,p)=>sum + p.price_cop*(state.cart[p.id] || 0),0) + shippingEstimate(destination.zone,state.commercial);
-        if(quote.total_cop !== estimate) { await refreshStorePrices(); render(); toast('El total cambió. Revisa el resumen y acepta de nuevo antes de continuar.'); return; }
-        let result;
-        try { result = await request('/api/payments/checkout','POST',{items,accepted:true,destination,expected_total_cop:quote.total_cop,idempotency_key:checkoutKey(items,destination,quote.total_cop)}); }
-        catch(error) {
-          if(error.code === 'quote_changed') { await refreshStorePrices(); render(); toast(error.message); return; }
-          let previous;
-          try { previous = JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null'); } catch {}
-          if (error.status === 409 && /^[a-f0-9]{64}$/.test(previous?.token || '')) {
-            location.hash = '#/pago?token=' + previous.token;
-            return;
-          }
-          throw error;
-        }
-        try {
-          const previous = JSON.parse(sessionStorage.getItem('bacata-checkout') || '{}');
-          sessionStorage.setItem('bacata-checkout',JSON.stringify({...previous,token:result.token}));
-        } catch {}
-        const url = new URL(result.checkout_url);
-        if (url.origin !== 'https://checkout.wompi.co') throw Error('Dirección de pago inválida');
-        location.assign(url.href);
-        return;
-      }
-    case 'order':
-      {
-        if (state.shippingDestination.zone === 'national' && !document.querySelector('#shipping-city')?.reportValidity()) return;
-        if (!document.querySelector('#accept-terms')?.checked) throw Error('Lee y acepta las condiciones de la demostración para continuar.');
-        const items = Object.entries(state.cart).map(([id, quantity]) => ({
-          id,
-          quantity
-        }));
-        const quote = await request('/api/shipping/quote','POST',{items,destination:state.shippingDestination});
-        const estimate = state.products.reduce((sum,p)=>sum + p.price_cop*(state.cart[p.id] || 0),0) + shippingEstimate(state.shippingDestination.zone,state.commercial);
-        if(quote.total_cop !== estimate) { await refreshStorePrices(); render(); toast('El total cambió. Revisa el resumen antes de continuar.'); return; }
-        const result = await request('/api/orders', 'POST', {items,destination:state.shippingDestination,expected_total_cop:quote.total_cop});
-        state.cart = {};
-        saveCart();
-        main.innerHTML = `<section class="wrap confirmation"><span class="eyebrow">SOLICITUD DE PRUEBA RECIBIDA</span><h1>Gracias por<br>elegir Bacatá.</h1><p>Que esta pieza acompañe tus próximos momentos.</p><div class="panel"><strong>${esc(result.id)}</strong><p>Importe estimado: ${money(result.total_cop)}.</p><p>No se procesó un pago ni se reservó inventario.</p></div><a class="btn" href="#/catalogo">Seguir explorando</a></section>`;
-        scrollTo(0, 0);
-        main.focus({
-          preventScroll: true
-        });
-        return;
-      }
+
   }
 }
 document.addEventListener('click', async event => {
@@ -523,6 +477,7 @@ document.addEventListener('click', async event => {
 });
 document.addEventListener('change', async event => {
   const input = event.target;
+  if(input.closest('#checkout-form') && input.name==='department'){state.checkoutDraft.department=input.value;state.checkoutDraft.city=input.value==='Bogotá D.C.'?'Bogotá':'';render();document.querySelector('#checkout-form [name=city]')?.focus();return;}
   if (input.id === 'shipping-zone') { state.shippingDestination={zone:input.value,city:input.value==='bogota'?'Bogotá':''};saveDestination();render();document.querySelector('#shipping-city')?.focus();return; }
   if (input.id === 'shipping-city') {state.shippingDestination.city=input.value;saveDestination();return;}
   if (input.id === 'catalog-sort') {
@@ -604,6 +559,7 @@ document.addEventListener('change', async event => {
   }
 });
 document.addEventListener('input', event => {
+  if(event.target.closest('#checkout-form') && Object.hasOwn(state.checkoutDraft,event.target.name)){state.checkoutDraft[event.target.name]=event.target.value;return;}
   if(event.target.id === 'shipping-city') {state.shippingDestination.city=event.target.value;saveDestination();return;}
   if (event.target.id !== 'search') return;
   const position = event.target.selectionStart;
@@ -616,7 +572,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['login', 'order-filter', 'order-review-form', 'commercial-form', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
+  if (!['login', 'checkout-form', 'order-filter', 'order-review-form', 'commercial-form', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
   event.preventDefault();
   if (form.dataset.uploading) {
     toast('Espera a que termine la carga de fotografías antes de guardar.');
@@ -689,6 +645,37 @@ document.addEventListener('submit', async event => {
       state.paymentConfig = state.admin.payments;
       if (state.tab === 'pedidos') await loadOrders();
       render();
+    }
+    if (form.id === 'checkout-form') {
+      const fields=Object.fromEntries(new FormData(form));
+      const customer=validateCustomer(Object.fromEntries(Object.keys(state.checkoutDraft).map(key=>[key,fields[key] || ''])));
+      state.checkoutDraft={...customer};
+      if(!form.elements.accepted.checked || !form.elements.privacy_accepted.checked)throw Error('Acepta los términos y autoriza el tratamiento de datos para gestionar el pedido');
+      const items=Object.entries(state.cart).map(([id,quantity])=>({id,quantity}));
+      const destination=customerDestination(customer);
+      const quote=await request('/api/shipping/quote','POST',{items,destination});
+      const estimate=state.products.reduce((sum,p)=>sum+p.price_cop*(state.cart[p.id] || 0),0)+shippingEstimate(destination.zone,state.commercial);
+      if(quote.total_cop!==estimate){await refreshStorePrices();render();toast('El total cambió. Revisa el resumen y acepta de nuevo antes de continuar.');return;}
+      const data={items,destination,customer,accepted:true,privacy_accepted:true,expected_total_cop:quote.total_cop};
+      if(state.paymentConfig.enabled) {
+        data.idempotency_key=checkoutKey(items,destination,quote.total_cop,customer);
+        let result;
+        try {result=await request('/api/payments/checkout','POST',data);}
+        catch(error){
+          if(error.code==='quote_changed'){await refreshStorePrices();render();toast(error.message);return;}
+          let prior;try{prior=JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null');}catch{}
+          if(error.status===409&&/^[a-f0-9]{64}$/.test(prior?.token || '')){location.hash='#/pago?token='+prior.token;return;}
+          throw error;
+        }
+        try{const previous=JSON.parse(sessionStorage.getItem('bacata-checkout') || '{}');sessionStorage.setItem('bacata-checkout',JSON.stringify({...previous,token:result.token}));}catch{}
+        const url=new URL(result.checkout_url);if(url.origin!=='https://checkout.wompi.co')throw Error('Dirección de pago inválida');
+        location.assign(url.href);
+      }else{
+        const result=await request('/api/orders','POST',data);
+        state.cart={};saveCart();
+        main.innerHTML=`<section class="wrap confirmation">${checkoutSteps(3)}<span class="eyebrow">SOLICITUD DE PRUEBA RECIBIDA</span><h1>Tu selección,<br>con seguimiento.</h1><div class="panel"><strong>${esc(result.id)}</strong><p>Total: ${money(result.total_cop)}</p><p>La pasarela está desactivada. No se procesó un pago ni se reservó inventario.</p></div><a class="btn" href="#/catalogo">Seguir explorando</a></section>`;
+        scrollTo(0,0);main.focus({preventScroll:true});
+      }
     }
     if (form.id === 'order-filter') {
       state.orderFilter = { ...Object.fromEntries(new FormData(form)), page:1 };

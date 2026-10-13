@@ -74,6 +74,8 @@ try {
 }
 export const set = db.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value');
 for (const [k, v] of Object.entries(GLOBAL_DEFAULTS)) db.prepare('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)').run(k, v);
+// Actualiza únicamente el plazo inicial; conserva condiciones personalizadas.
+db.prepare("UPDATE settings SET value=? WHERE key='delivery_days' AND value='5 a 10 días hábiles'").run('1 a 5 días hábiles desde la confirmación del pedido');
 export const settings = () => Object.fromEntries(db.prepare('SELECT key,value FROM settings').all().map(x => [x.key, x.value]));
 export function audit(actor, action, subject, details = {}) {
   db.prepare('INSERT INTO audit(actor,action,subject,details,created_at) VALUES(?,?,?,?,?)').run(actor, action, subject, JSON.stringify(details), new Date().toISOString());

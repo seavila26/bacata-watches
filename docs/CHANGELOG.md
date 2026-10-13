@@ -85,3 +85,10 @@ v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorpo
 - Bogotá gratis y demás ciudades $25.000 COP por pedido, editables en Información comercial.
 - Destino en bolsa, cálculo de total en servidor y envío incluido en la firma Wompi.
 - Desglose guardado por solicitud; conserva importes históricos al cambiar tarifas.
+
+## Checkout en tres pasos — 2026-10-13
+
+- Carrito, Datos y Confirmación conectados, con departamento, dirección y consentimientos separados.
+- Comprador privado y aceptación de políticas guardados junto con pedido/pago.
+- Confirmación incluye artículos, destino y totales verificados; los datos de contacto no se exponen.
+- Plazo inicial 1–5 días desde confirmación. Mantiene sandbox y vencimiento de pago, sin anunciar reserva de stock.

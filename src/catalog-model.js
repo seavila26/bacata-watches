@@ -19,7 +19,7 @@ export const GLOBAL_DEFAULTS = {
   logistics_rate: '0',
   discount: '0.03',
   min_margin: '0.10',
-  delivery_days: '5 a 10 días hábiles',
+  delivery_days: '1 a 5 días hábiles desde la confirmación del pedido',
   warranty: 'Garantía del comercio según las condiciones de compra',
   shipping_terms: 'Condiciones de envío informadas al finalizar la compra'
 };

@@ -1,3 +1,4 @@
+import { customerFixture } from './checkout-fixture.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -27,7 +28,7 @@ test('editable shipping tariffs are validated, signed in checkout and preserved 
     assert.throws(()=>destination({zone:'bogota',shipping_cop:0}),e=>e.status===400);
     for(const invalid of [-1,1.5,'',null,true,1000001,'NaN'])assert.throws(()=>validateCommercial({...commercialDefaults,shipping_national_cop:invalid}),/tarifas/);
     assert.equal(validateCommercial({...commercialDefaults,shipping_national_cop:'35000'}).shipping_national_cop,35000);
-    const input={items,accepted:true,idempotency_key:'f'.repeat(64),destination:{zone:'national',city:'Medellín'},expected_total_cop:3905000};
+    const input={items,accepted:true,customer:{...customerFixture,department:'Antioquia',city:'Medellín'},privacy_accepted:true,idempotency_key:'f'.repeat(64),destination:{zone:'national',city:'Medellín'},expected_total_cop:3905000};
     const first=createCheckout(input,'https://example.com',config);
     assert.equal(new URL(first.checkout_url).searchParams.get('amount-in-cents'),'390500000');
     assert.equal(paymentState(first.token).shipping_cop,25000);
@@ -44,7 +45,7 @@ test('editable shipping tariffs are validated, signed in checkout and preserved 
     const previous={commercial:state.commercial,products:state.products,cart:state.cart,shippingDestination:state.shippingDestination};
     try {
       state.commercial=commercialProfile();state.products=[{id:'p1',brand:'Bulova',name:'Racer',reference:'98B428',price_cop:1940000}];state.cart={p1:2};state.shippingDestination={zone:'national',city:'Medellín'};
-      assert.ok(cart().includes('35.000'));assert.ok(cart().includes('3.915.000'));assert.ok(conditions().includes('10.000'));
+      assert.ok(cart().includes('Continuar a Datos'));assert.ok(!cart().includes('accept-terms'));assert.ok(conditions().includes('10.000'));
     } finally {Object.assign(state,previous);}
   } finally {db.close();await rm(dir,{recursive:true,force:true});}
 });

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { checkoutCustomer, checkCustomerDestination, storeCustomer } from './checkout-customer.js';
 import { quoteDelivery, assertTotal, storeDelivery } from './shipping.js';
 import { quoteItems } from './order-quote.js';
 import { paymentConfig, createCheckout, paymentState, verifyPayment, receiveEvent } from './wompi.js';
@@ -187,14 +188,18 @@ async function handler(req, res) {
       if (!csrf(req, res)) return;
       if (limited(req, res, orderLimits, globalOrderLimit)) return;
       const d = await readJson(req, 16384);
+      const customer = d.customer ? checkoutCustomer(d.customer,d.privacy_accepted) : null;
+      if(customer && d.accepted!==true) throw httpError(400,'Acepta los términos de compra');
       const quote = d.destination ? quoteDelivery(d.items,d.destination) : quoteItems(d.items);
       if (d.destination) assertTotal(d.expected_total_cop,quote);
+      if(customer) {if(!quote.destination)throw httpError(400,'Completa el destino');checkCustomerDestination(customer,quote.destination);}
       const {total,items}=quote;
       const id = 'AUR-' + randomBytes(5).toString('hex').toUpperCase();
       db.exec('BEGIN IMMEDIATE');
       try {
         db.prepare('INSERT INTO orders(id,items_json,total_cop,created_at) VALUES(?,?,?,?)').run(id, JSON.stringify(items), total, new Date().toISOString());
         if(d.destination) storeDelivery(id,quote);
+        if(customer) storeCustomer(id,customer);
         db.exec('COMMIT');
       } catch(e) {db.exec('ROLLBACK');throw e;}
       audit('customer', 'order_created', id, {

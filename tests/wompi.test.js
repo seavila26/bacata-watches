@@ -1,3 +1,4 @@
+import { customerFixture } from './checkout-fixture.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -19,7 +20,7 @@ test('sandbox checkout signs server prices, verifies private API, rejects forged
     assert.throws(()=>wompiConfig({WOMPI_MODE:'sandbox',WOMPI_PUBLIC_KEY:'pub_prod_wrong'}), /WOMPI_PUBLIC_KEY/);
     const now=new Date().toISOString();
     db.prepare(`INSERT INTO products(id,identity_key,brand,reference,name,price_usd,market_cop,status,updated_at,last_confirmed_at,published_at,collection,movement,diameter_mm,material,crystal,water_resistance,dial_color,strap,image_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('p1','fixture','Bulova','98B428','Racer',100,2000000,'published',now,now,now,'Racer','Cuarzo',40,'Acero','Zafiro','100 metros','Negro','Acero','https://example.com/watch.webp');
-    const input={items:[{id:'p1',quantity:2}],accepted:true,destination:{zone:'bogota',city:'Bogotá'},expected_total_cop:3880000,idempotency_key:'a'.repeat(64)};
+    const input={items:[{id:'p1',quantity:2}],accepted:true,customer:customerFixture,privacy_accepted:true,destination:{zone:'bogota',city:'Bogotá'},expected_total_cop:3880000,idempotency_key:'a'.repeat(64)};
     assert.throws(()=>createCheckout(input,'https://example.com',{enabled:false}), e=>e.status===503);
     assert.throws(()=>createCheckout({...input,amount_in_cents:1},'https://example.com',config), e=>e.status===400);
     assert.throws(()=>createCheckout({...input,accepted:false},'https://example.com',config), e=>e.status===400);
@@ -81,7 +82,7 @@ test('sandbox checkout signs server prices, verifies private API, rejects forged
     db.prepare('UPDATE payment_attempts SET expires_at=? WHERE reference=?').run('2020-01-01T00:00:00Z',expiry.reference);
     assert.throws(()=>createCheckout({...input,idempotency_key:'c'.repeat(64)},'https://example.com',config),e=>e.status===409);
 
-    assert.equal(Object.keys(paymentState(checkout.token)).some(k=>/note|items|token|key|secret/.test(k)),false);
+    assert.equal(Object.keys(paymentState(checkout.token)).some(k=>/note|customer|token|key|secret/.test(k)),false);
     assert.throws(()=>paymentState('guessed'),e=>e.status===404);
     const prev=state.paymentResult;state.paymentResult=paymentState(checkout.token);assert.ok(paymentView().includes('Anulado'));state.paymentResult=prev;
   } finally {db.close();await rm(dir,{recursive:true,force:true});}

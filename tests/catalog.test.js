@@ -277,7 +277,7 @@ test('global rule changes recalculate and pause with audit; all public fields fo
   const p = product(),
     publicP = publicProduct(p, calculate(p), settings());
   assert.equal(publicP.availability, 'available');
-  assert.equal(publicP.delivery_days, '5 a 10 días hábiles');
+  assert.equal(publicP.delivery_days, '1 a 5 días hábiles desde la confirmación del pedido');
   for (const k of ['stock', 'sale_mode', 'supplier_url', 'price_usd', 'shipping_usd', 'market_cop', 'source_snapshot_json', 'analysis', 'approved_price_cop', 'margin', 'cost', 'pause_reason']) assert.equal(k in publicP, false);
   set.run('min_margin', '0.8');
   reconcileAll('admin');

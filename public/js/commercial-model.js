@@ -16,7 +16,7 @@ export const commercialFields = [
 export const commercialDefaults = {
   trade_name: 'Relojería Bacatá', legal_name: '', tax_id: '', address: '', email: '',
   whatsapp: '573246871623', coverage: 'Colombia',
-  delivery: 'El plazo de entrega se confirma según la referencia y el destino antes de la compra.',
+  delivery: 'Entrega de 1 a 5 días hábiles desde la confirmación del pedido.',
   shipping: 'El envío se calcula según el destino y se muestra antes de confirmar el pago.',
   shipping_bogota_cop: 0, shipping_national_cop: 25000,
   warranty: 'La garantía aplicable, su duración, responsable y documentación se confirman para cada referencia antes de comprar. Para solicitar orientación, contacta a Bacatá por WhatsApp con la referencia y una descripción de la falla. No envíes el reloj sin coordinar su recepción.',

@@ -1,3 +1,4 @@
+import { customerDefaults } from './checkout-model.js';
 import { commercialDefaults } from './commercial-model.js';
 function readDestination() {
   try { const value=JSON.parse(sessionStorage.getItem('bacata-destination') || 'null');
@@ -40,6 +41,7 @@ export const state = {
   admin: null,
   paymentConfig: { enabled:false, mode:'disabled' },
   paymentResult:null,
+  checkoutDraft: {...customerDefaults},
   shippingDestination: readDestination(),
   paymentError:'',
   orderList: null,

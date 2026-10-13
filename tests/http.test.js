@@ -150,7 +150,7 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
     assert.equal(list.length, 4);
     const p = list[0];
     assert.equal(p.availability, 'available');
-    assert.equal(p.delivery_days, '5 a 10 días hábiles');
+    assert.equal(p.delivery_days, '1 a 5 días hábiles desde la confirmación del pedido');
     const allowed = ['id', 'brand', 'name', 'reference', 'variant', 'description', 'image_url', 'collection', 'movement', 'diameter_mm', 'style', 'condition', 'material', 'crystal', 'water_resistance', 'dial_color', 'case_color', 'strap_color', 'strap', 'package_contents', 'provenance', 'images', 'availability', 'price_cop', 'delivery_days', 'warranty', 'shipping_terms', 'is_demo'];
     assert.deepEqual(Object.keys(p).sort(), allowed.sort());
     assert.equal((await send('/api/orders', {
