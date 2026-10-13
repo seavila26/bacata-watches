@@ -1,3 +1,4 @@
+import { commercialDefaults } from './commercial-model.js';
 function readCart() {
   try {
     const data = JSON.parse(localStorage.getItem('aurel-cart') || '{}');
@@ -29,6 +30,7 @@ export const state = {
   adminStatus: '',
   adminPage: 0,
   products: [],
+  commercial: { ...commercialDefaults },
   admin: null,
   tab: 'resumen',
   catalogSort: 'selection',

@@ -175,3 +175,5 @@
 .product-card:hover { border-color: var(--line); box-shadow: var(--shadow); }.product-card__body { padding-inline: 12px; padding-bottom: 16px; }
 
 .art .image-error { color: var(--gray); }
+
+.policy-copy { white-space: pre-line; overflow-wrap: anywhere; }

@@ -60,3 +60,9 @@ v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorpo
 - WhatsApp con consulta por referencia y cobertura Colombia.
 - Página de garantía conectada desde fichas, contacto y pie; distingue cobertura del proveedor y derechos en Colombia.
 - Identificación legal y condiciones de venta siguen pendientes; no se habilitan cobros.
+
+## Información comercial administrable — 2026-10-13
+
+- Sección privada para editar contacto, identidad legal, envíos, garantía, cambios y privacidad.
+- Persistencia SQLite, auditoría, validación y lectura pública; textos provisionales iniciales sin identificaciones ficticias.
+- Las condiciones públicas usan los valores guardados; guardar no altera rentabilidad ni publicaciones.

@@ -127,3 +127,8 @@ tbody tr:hover { background: var(--hover-surface); }
 #admin-tabpanel .table-wrap+button { margin-top: 24px; }
 th { position: sticky; top: 0; } .table-wrap { border-radius: 8px; }
 .table-wrap summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; text-decoration: underline; text-underline-offset: 4px; }
+
+.commercial-form { display: grid; gap: 24px; }
+.commercial-fields { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.commercial-fields__wide { grid-column: 1 / -1; }
+@media (max-width: 640px) { .commercial-fields { grid-template-columns: 1fr; } }

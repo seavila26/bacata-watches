@@ -2,13 +2,8 @@
 export const brand = {
   name: 'Relojería Bacatá',
   signature: 'Tiempo que se siente',
-  primaryLogo: '/assets/bacata-logo.png',
-  // Completar con los canales comerciales validados antes de publicar.
-  contactEmail: '',
-  whatsapp: '573246871623',
-  whatsappLabel: '+57 324 687 1623',
-  shippingCoverage: 'Colombia',
-  address: ''
+  // Contacto y condiciones se editan en Centro de control > Información comercial.
+  primaryLogo: '/assets/bacata-logo.png'
 };
 
 /** Una campaña a la vez. Fechas con offset Colombia (-05:00).

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { commercialProfile, saveCommercial } from './commercial.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
@@ -147,6 +148,7 @@ async function handler(req, res) {
     if (path === '/api/admin/session' && method === 'GET') return json(res, 200, {
       authenticated: auth(req)
     });
+    if (path === '/api/commercial' && method === 'GET') return json(res, 200, { commercial: commercialProfile() });
     if (path === '/api/products' && method === 'GET') {
       const rows = db.prepare("SELECT * FROM products WHERE status='published' ORDER BY updated_at DESC").all().filter(p => isVisible(p)).map(p => publicProduct(p, calculate(p), settings()));
       return json(res, 200, {
@@ -197,11 +199,17 @@ async function handler(req, res) {
         const jobs = db.prepare('SELECT * FROM jobs ORDER BY id DESC LIMIT 10').all();
         return json(res, 200, {
           products: rows,
+          commercial: commercialProfile(),
           settings: settings(),
           jobs,
           orders: db.prepare('SELECT * FROM orders ORDER BY created_at DESC LIMIT 30').all(),
           audit: db.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT 30').all()
         });
+      }
+      if (path === '/api/admin/commercial' && method === 'PUT') {
+        const data = await readJson(req, 65536);
+        try { return json(res, 200, { commercial: saveCommercial(data, email) }); }
+        catch (e) { if (e.constructor === Error && !e.code) return error(res, 400, e.message); throw e; }
       }
       if (path === '/api/admin/settings' && method === 'PUT') {
         const d = await readJson(req);

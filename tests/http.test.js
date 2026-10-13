@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { once } from 'node:events';
 import { DatabaseSync } from 'node:sqlite';
 import ExcelJS from 'exceljs';
+import { commercialDefaults } from '../public/js/commercial-model.js';
 import { fixture } from './fixtures.js';
 test('HTTP complete workflow, cross-page export, public privacy, stale purchase rejection and admin actions', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'bacata-http-')),
@@ -63,6 +64,8 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
       }
     }).then(r => r.json());
     assert.equal((await fetch(base + '/api/admin/overview')).status, 401);
+    assert.equal((await send('/api/admin/commercial', commercialDefaults, 'PUT')).status, 401);
+    assert.equal((await get('/api/commercial')).commercial.whatsapp, '573246871623');
     assert.equal((await send('/api/admin/catalog/export', {
       ids: ['anything']
     })).status, 401);
@@ -79,6 +82,21 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
     });
     assert.equal(login.status, 200);
     cookie = login.headers.get('set-cookie').split(';')[0];
+    const commercialBefore = (await get('/api/admin/overview')).settings;
+    const commercial = { ...commercialDefaults, trade_name: 'Bacatá revisión', shipping: 'Envío sujeto a cotización individual.' };
+    assert.equal((await send('/api/admin/commercial', { ...commercial, provisional: false }, 'PUT')).status, 400);
+    assert.equal((await send('/api/admin/commercial', { ...commercial, private_key: 'no' }, 'PUT')).status, 400);
+    const crossSiteCommercial = await fetch(base + '/api/admin/commercial', { method:'PUT', headers:{ cookie, origin:'https://other.example', 'content-type':'application/json' }, body:JSON.stringify(commercial) });
+    assert.equal(crossSiteCommercial.status, 403);
+    assert.equal((await send('/api/admin/commercial', commercial, 'PUT')).status, 200);
+    assert.deepEqual((await get('/api/commercial')).commercial, commercial);
+    const commercialOverview = await get('/api/admin/overview');
+    assert.deepEqual(commercialOverview.settings, commercialBefore);
+    assert.ok(commercialOverview.audit.some(row => row.action === 'commercial_updated'));
+    const persistedProfile = new DatabaseSync(dbPath, { readOnly: true });
+    assert.deepEqual(JSON.parse(persistedProfile.prepare('SELECT data_json FROM commercial_profile WHERE id=1').get().data_json), commercial);
+    persistedProfile.close();
+
     const preview = await (await raw('/api/admin/inventory/preview', await fixture({
       count: 55
     }))).json();

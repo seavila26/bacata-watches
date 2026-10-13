@@ -3,7 +3,7 @@ import { state } from './js/state.js';
 import { api, request, normalizeProducts } from './js/api.js';
 import { money, escapeHtml as esc, safeImage } from './js/utils.js';
 import { art, emptyState } from './js/components.js';
-import { home, catalog, detail, cart, brands, principles, editorial, contact, conditions, warranty } from './js/views/store.js';
+import { home, catalog, detail, cart, brands, principles, editorial, contact, conditions, warranty, privacy } from './js/views/store.js';
 import { activeCampaign } from './js/config.js';
 import { filteredOpportunities } from './js/views/admin.js';
 import { filteredPublications } from './js/views/publications.js';
@@ -63,7 +63,8 @@ function render() {
     '/editorial': editorial,
     '/contacto': () => contact(query.get('reference') || ''),
     '/condiciones': conditions,
-    '/garantia': warranty
+    '/garantia': warranty,
+    '/privacidad': privacy
   };
   main.innerHTML = path.startsWith('/admin') ? admin() : path.startsWith('/reloj/') ? detail(path.slice(7)) : path.startsWith('/editorial/') ? editorial(path.slice(11)) : views[path] ? views[path]() : `<section class="wrap">${emptyState('No encontramos esta página.', 'Vuelve al inicio para seguir explorando.', '<a class="btn" href="#/">Volver al inicio</a>')}</section>`;
   document.querySelectorAll('.desktop-nav a').forEach(a => {
@@ -106,10 +107,12 @@ async function route() {
       const data = session.authenticated ? await api('/api/admin/overview') : null;
       if (sequence !== routeSequence) return;
       state.admin = data;
+      if (data) state.commercial = data.commercial;
     } else {
-      const data = await api('/api/products');
+      const [data, profile] = await Promise.all([api('/api/products'), api('/api/commercial')]);
       if (sequence !== routeSequence) return;
       state.products = normalizeProducts(data.products);
+      state.commercial = profile.commercial;
     }
     render();
     scrollTo(0, 0);
@@ -126,6 +129,7 @@ async function refresh() {
   const [products, operations] = await Promise.all([api('/api/products'), api('/api/admin/overview')]);
   state.products = normalizeProducts(products.products);
   state.admin = operations;
+  state.commercial = operations.commercial;
   render();
 }
 function openDialog(id) {
@@ -486,7 +490,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['login', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
+  if (!['login', 'commercial-form', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
   event.preventDefault();
   if (form.dataset.uploading) {
     toast('Espera a que termine la carga de fotografías antes de guardar.');
@@ -556,6 +560,13 @@ document.addEventListener('submit', async event => {
       await request('/api/admin/login', 'POST', Object.fromEntries(new FormData(form)));
       state.admin = await api('/api/admin/overview');
       render();
+    }
+    if (form.id === 'commercial-form') {
+      const data = Object.fromEntries(new FormData(form));
+      data.provisional = form.elements.provisional.checked;
+      await request('/api/admin/commercial', 'PUT', data);
+      await refresh();
+      toast('Información comercial guardada.');
     }
     if (form.id === 'settings-form') {
       const data = Object.fromEntries(new FormData(form));
