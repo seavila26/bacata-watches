@@ -16,7 +16,9 @@
     "node": ">=22.13"
   },
   "dependencies": {
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "sharp": "^0.35.5",
+    "yauzl": "^3.4.0"
   },
   "overrides": {
     "exceljs": {

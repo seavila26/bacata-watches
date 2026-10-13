@@ -41,6 +41,16 @@
 - Pruebas de recuperación, foto ausente, alteración de archivos, rotación y formato condicional extendido.
 - 25 pruebas aprobadas y auditoría de dependencias sin vulnerabilidades conocidas al comprobar esta entrega. Configuración externa del respaldo pendiente; instrucciones en `RESPALDOS.md`.
 
+## Seguridad de administración y cargas · 13 octubre 2026
+
+- Limitación de intentos, scrypt asíncrono y sesiones con vencimiento absoluto e inactividad.
+- Cookies malformadas rechazadas, rotación al ingresar y revocación al salir.
+- JSON/base64 estrictos, límites por bytes y protección de origen.
+- XLSX revisado al descomprimir y procesado en un worker con recursos acotados.
+- Fotografías nuevas decodificadas, limitadas y normalizadas a WebP; imágenes existentes conservadas.
+- Dirección local de escucha e IP real solo desde proxy de loopback configurado.
+- 32 pruebas y auditoría sin vulnerabilidades conocidas al comprobar la entrega; actualización descrita en `SEGURIDAD.md`.
+
 ## Versiones anteriores
 
 v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorporó importación XLSX y editor persistente. v0.5 incorporó un flujo de preparación de catálogo que esta versión reemplaza por completo.

@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+import { readWorkbook } from './workbook-reader.js';
 import { randomUUID } from 'node:crypto';
 import { db, settings, calculate, audit } from './db.js';
 import { COLUMNS, catalogRow, workbookBuffer } from './catalog-export.js';
@@ -22,8 +22,7 @@ function value(c) {
   return v;
 }
 export async function previewCatalog(buffer, actor) {
-  const w = new ExcelJS.Workbook();
-  await w.xlsx.load(buffer);
+  const w = await readWorkbook(buffer);
   const s = w.getWorksheet('catalogo');
   if (!s) throw Error('Falta la hoja catalogo');
   if (s.rowCount > 10001) throw Error('Máximo 10.000 filas');
