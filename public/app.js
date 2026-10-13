@@ -275,6 +275,10 @@ async function act(button) {
       document.querySelector('#admin-tabpanel')?.focus({ preventScroll: true });
       enterView(document.querySelector('#admin-tabpanel'));
       return;
+    case 'order-manage':
+      document.querySelector('.fulfillment-layout')?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+      document.querySelector('#fulfillment-form [name=status]')?.focus({preventScroll:true});
+      return;
     case 'order-open':
       state.selectedOrder = (await api('/api/admin/orders/' + encodeURIComponent(id))).order;
       render();
@@ -572,7 +576,7 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('submit', async event => {
   const form = event.target;
-  if (!['login', 'checkout-form', 'order-filter', 'order-review-form', 'commercial-form', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
+  if (!['login', 'checkout-form', 'order-filter', 'order-review-form', 'fulfillment-form', 'commercial-form', 'settings-form', 'product-form', 'global-search', 'inventory-form', 'preview-filter', 'admin-filter', 'catalog-form', 'publication-filter'].includes(form.id)) return;
   event.preventDefault();
   if (form.dataset.uploading) {
     toast('Espera a que termine la carga de fotografías antes de guardar.');
@@ -680,6 +684,11 @@ document.addEventListener('submit', async event => {
     if (form.id === 'order-filter') {
       state.orderFilter = { ...Object.fromEntries(new FormData(form)), page:1 };
       await loadOrders(); render();
+    }
+    if(form.id === 'fulfillment-form') {
+      const data={...Object.fromEntries(new FormData(form)),version:Number(form.dataset.version),simulate:form.elements.simulate.type==='checkbox' && form.elements.simulate.checked};
+      state.selectedOrder=(await request('/api/admin/orders/'+encodeURIComponent(form.dataset.id)+'/fulfillment','PATCH',data)).order;
+      await refresh();toast('Gestión del pedido guardada.');
     }
     if (form.id === 'order-review-form') {
       const data = { ...Object.fromEntries(new FormData(form)), version:Number(form.dataset.version) };

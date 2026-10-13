@@ -46,7 +46,7 @@ export const state = {
   paymentError:'',
   orderList: null,
   selectedOrder: null,
-  orderFilter: { q: '', status: '', page: 1 },
+  orderFilter: { q: '', status: '', fulfillment:'', payment:'', page: 1 },
   tab: 'resumen',
   catalogSort: 'selection',
   selected: null,

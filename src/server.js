@@ -3,7 +3,7 @@ import { checkoutCustomer, checkCustomerDestination, storeCustomer } from './che
 import { quoteDelivery, assertTotal, storeDelivery } from './shipping.js';
 import { quoteItems } from './order-quote.js';
 import { paymentConfig, createCheckout, paymentState, verifyPayment, receiveEvent } from './wompi.js';
-import { requestList, requestDetail, reviewRequest } from './orders.js';
+import { requestList, requestDetail, reviewRequest, manageFulfillment } from './orders.js';
 import { commercialProfile, saveCommercial } from './commercial.js';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
@@ -216,6 +216,8 @@ async function handler(req, res) {
       if (!guard(req, res)) return;
       if (method !== 'GET' && !csrf(req, res)) return;
       if (path === '/api/admin/orders' && method === 'GET') return json(res, 200, requestList(u.searchParams));
+      const fulfillmentRoute=path.match(/^\/api\/admin\/orders\/([^/]+)\/fulfillment$/);
+      if(fulfillmentRoute && method==='PATCH')return json(res,200,{order:manageFulfillment(decodeURIComponent(fulfillmentRoute[1]),await readJson(req,32768),email)});
       const orderRoute = path.match(/^\/api\/admin\/orders\/([^/]+)$/);
       if (orderRoute && method === 'GET') return json(res, 200, { order: requestDetail(decodeURIComponent(orderRoute[1])) });
       if (orderRoute && method === 'PATCH') return json(res, 200, { order: reviewRequest(decodeURIComponent(orderRoute[1]), await readJson(req, 32768), email) });

@@ -92,3 +92,9 @@ v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorpo
 - Comprador privado y aceptación de políticas guardados junto con pedido/pago.
 - Confirmación incluye artículos, destino y totales verificados; los datos de contacto no se exponen.
 - Plazo inicial 1–5 días desde confirmación. Mantiene sandbox y vencimiento de pago, sin anunciar reserva de stock.
+
+## Gestión comercial y entrega — 2026-10-13
+
+- Cinco etapas secuenciales, transportadora, guía e historial privado por pedido.
+- Exige pago verificado y datos de entrega; simulación explícita para sandbox.
+- Filtros de pago/gestión y búsqueda por guía; conserva importes y registros existentes.

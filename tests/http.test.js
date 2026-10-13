@@ -68,6 +68,7 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
     assert.equal((await send('/api/payments/checkout',{items:[{id:'p',quantity:1}],accepted:true,idempotency_key:'a'.repeat(64)})).status,503);
     assert.equal((await fetch(base+'/pago?token=not-secret')).status,200);
     assert.equal((await fetch(base + '/api/admin/orders')).status, 401);
+    assert.equal((await send('/api/admin/orders/private/fulfillment',{status:'confirmed'},'PATCH')).status,401);
     assert.equal((await fetch(base + '/api/admin/orders/AUR-private')).status, 401);
     assert.equal((await send('/api/admin/commercial', commercialDefaults, 'PUT')).status, 401);
     assert.equal((await get('/api/commercial')).commercial.whatsapp, '573246871623');
@@ -110,6 +111,9 @@ test('HTTP complete workflow, cross-page export, public privacy, stale purchase 
     assert.equal((await send('/api/admin/orders/AUR-review-test',{version:savedRequest.version,status:'reviewed',admin_note:'Validada'},'PATCH')).status,200);
     assert.equal((await send('/api/admin/orders/AUR-review-test',{version:savedRequest.version,status:'archived',admin_note:''},'PATCH')).status,409);
     assert.equal((await get('/api/admin/orders/AUR-review-test')).order.admin_note,'Validada');
+    assert.equal((await send('/api/admin/orders/AUR-review-test/fulfillment',{status:'confirmed',version:1,carrier:'',tracking_number:'',note:'confirmar',simulate:false},'PATCH')).status,409);
+    assert.equal((await send('/api/admin/orders/AUR-review-test/fulfillment',{status:'paid',version:1,carrier:'',tracking_number:'',note:'confirmar',simulate:false},'PATCH')).status,400);
+    assert.equal((await get('/api/admin/orders?fulfillment=pending&payment=none')).total,1);
     assert.equal((await get('/api/products')).orders,undefined);
     const preview = await (await raw('/api/admin/inventory/preview', await fixture({
       count: 55
