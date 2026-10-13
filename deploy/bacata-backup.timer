@@ -1,0 +1,11 @@
+[Unit]
+Description=Respaldo diario de Bacata a las 03:00 de Bogota
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 America/Bogota
+Persistent=true
+RandomizedDelaySec=5min
+Unit=bacata-backup.service
+
+[Install]
+WantedBy=timers.target

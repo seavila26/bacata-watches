@@ -32,6 +32,15 @@
 - Logo original contenido sin recortar; márgenes del modo oscuro ajustados a la barra.
 - Posición fija del menú administrativo alineada con la nueva altura.
 
+## Preparación operativa · 13 octubre 2026
+
+- Override de uuid 11.1.1 para ExcelJS; conservadas versión y funciones de importación.
+- Copias SQLite conscientes del WAL, fotografías locales, SHA-256, integridad y conteos.
+- Retención de 14 copias verificadas, rutas privadas y comprobación de imágenes referenciadas.
+- Servicio y timer diarios a las 03:00 de Bogotá, con registro de fallos y bloqueo de concurrencia.
+- Pruebas de recuperación, foto ausente, alteración de archivos, rotación y formato condicional extendido.
+- 25 pruebas aprobadas y auditoría de dependencias sin vulnerabilidades conocidas al comprobar esta entrega. Configuración externa del respaldo pendiente; instrucciones en `RESPALDOS.md`.
+
 ## Versiones anteriores
 
 v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorporó importación XLSX y editor persistente. v0.5 incorporó un flujo de preparación de catálogo que esta versión reemplaza por completo.

@@ -1,0 +1,16 @@
+[Unit]
+Description=Respaldo verificado de Bacata (SQLite y fotografias)
+After=bacata.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/bacata-app
+Environment=BACKUP_DIR=/home/deploy/bacata-backups
+Environment=BACKUP_KEEP=14
+ExecStart=/usr/bin/flock -n /home/deploy/bacata-backups/.backup.lock /usr/bin/node --env-file=/home/deploy/bacata-app/.env /home/deploy/bacata-app/scripts/backup.mjs
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+TimeoutStartSec=30min
