@@ -19,7 +19,7 @@ test('sandbox checkout signs server prices, verifies private API, rejects forged
     assert.throws(()=>wompiConfig({WOMPI_MODE:'sandbox',WOMPI_PUBLIC_KEY:'pub_prod_wrong'}), /WOMPI_PUBLIC_KEY/);
     const now=new Date().toISOString();
     db.prepare(`INSERT INTO products(id,identity_key,brand,reference,name,price_usd,market_cop,status,updated_at,last_confirmed_at,published_at,collection,movement,diameter_mm,material,crystal,water_resistance,dial_color,strap,image_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('p1','fixture','Bulova','98B428','Racer',100,2000000,'published',now,now,now,'Racer','Cuarzo',40,'Acero','Zafiro','100 metros','Negro','Acero','https://example.com/watch.webp');
-    const input={items:[{id:'p1',quantity:2}],accepted:true,idempotency_key:'a'.repeat(64)};
+    const input={items:[{id:'p1',quantity:2}],accepted:true,destination:{zone:'bogota',city:'Bogotá'},expected_total_cop:3880000,idempotency_key:'a'.repeat(64)};
     assert.throws(()=>createCheckout(input,'https://example.com',{enabled:false}), e=>e.status===503);
     assert.throws(()=>createCheckout({...input,amount_in_cents:1},'https://example.com',config), e=>e.status===400);
     assert.throws(()=>createCheckout({...input,accepted:false},'https://example.com',config), e=>e.status===400);

@@ -79,3 +79,9 @@ v0.3 incorporó el diseño Bacatá y la organización del frontend. v0.4 incorpo
 - Consulta privada de transacciones, eventos firmados y cotejo de referencia/monto/moneda.
 - Estado de prueba en retorno y solicitudes; conserva la bolsa hasta confirmación de su intento.
 - Desactivado por defecto; acepta únicamente claves sandbox. Cobros reales pendientes.
+
+## Tarifas de envío administrables — 2026-10-13
+
+- Bogotá gratis y demás ciudades $25.000 COP por pedido, editables en Información comercial.
+- Destino en bolsa, cálculo de total en servidor y envío incluido en la firma Wompi.
+- Desglose guardado por solicitud; conserva importes históricos al cambiar tarifas.

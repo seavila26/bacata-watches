@@ -1,4 +1,5 @@
 import { db, audit } from './db.js';
+import { deliveryDetails } from './shipping.js';
 import { paymentSummary } from './wompi.js';
 import { httpError } from './security.js';
 const columns = new Set(db.prepare('PRAGMA table_info(orders)').all().map(c => c.name));
@@ -11,7 +12,7 @@ try {
 } catch (e) { db.exec('ROLLBACK'); throw e; }
 export const requestStates = ['payment_pending', 'reviewed', 'archived'];
 function detail(row) {
-  return { id:row.id, status:row.status, created_at:row.created_at, updated_at:row.updated_at || row.created_at, total_cop:row.total_cop, admin_note:row.admin_note, version:row.version, items:JSON.parse(row.items_json), payment:paymentSummary(row.id) };
+  return { id:row.id, status:row.status, created_at:row.created_at, updated_at:row.updated_at || row.created_at, total_cop:row.total_cop, admin_note:row.admin_note, version:row.version, items:JSON.parse(row.items_json), payment:paymentSummary(row.id), delivery:deliveryDetails(row.id) };
 }
 export function requestDetail(id) {
   const row = db.prepare('SELECT * FROM orders WHERE id=?').get(id);

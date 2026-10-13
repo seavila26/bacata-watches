@@ -26,9 +26,12 @@ test('sandbox HTTP exposes no secrets, signs checkout, persists across restart a
     const db=new DatabaseSync(dbPath), now=new Date().toISOString();
     db.prepare(`INSERT INTO products(id,identity_key,brand,reference,name,price_usd,market_cop,status,updated_at,last_confirmed_at,published_at,collection,movement,diameter_mm,material,crystal,water_resistance,dial_color,strap,image_url) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run('p1','fixture','Bulova','98B428','Racer',100,2000000,'published',now,now,now,'Racer','Cuarzo',40,'Acero','Zafiro','100 metros','Negro','Acero','https://example.com/watch.webp');
     db.close();
-    const input={items:[{id:'p1',quantity:2}],accepted:true,idempotency_key:'d'.repeat(64)};
+    const input={items:[{id:'p1',quantity:2}],accepted:true,destination:{zone:'bogota',city:'Bogotá'},expected_total_cop:3880000,idempotency_key:'d'.repeat(64)};
     const send=(path,body,headers={})=>fetch(base+path,{method:'POST',headers:{'content-type':'application/json',...headers},body:JSON.stringify(body)});
     assert.deepEqual(await (await fetch(base+'/api/payments/config')).json(),{mode:'sandbox',enabled:true});
+    assert.equal((await send('/api/shipping/quote',{items:input.items,destination:{zone:'national',city:'Medellín'}})).status,200);
+    const shippingQuote=await (await send('/api/shipping/quote',{items:input.items,destination:{zone:'national',city:'Medellín'}})).json();assert.equal(shippingQuote.total_cop,3905000);
+    assert.equal((await send('/api/payments/checkout',{...input,destination:{zone:'national',city:'Medellín'},expected_total_cop:3880000})).status,409);
     assert.equal((await send('/api/payments/checkout',input,{origin:'https://other.example'})).status,403);
     const response=await send('/api/payments/checkout',input);assert.equal(response.status,201);
     const checkout=await response.json(), text=JSON.stringify(checkout);

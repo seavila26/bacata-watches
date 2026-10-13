@@ -29,7 +29,7 @@ Después de guardar: `chmod 600 .env`, `sudo systemctl restart bacata` y comprob
 3. Al regresar, la tienda muestra el estado confirmado por el servidor. Una redirección no acredita aprobación. El servidor consulta con llave privada y recibe eventos firmados; la pantalla reconsulta cada 15 segundos durante un máximo de dos minutos si sigue pendiente, y ofrece consulta manual. Un error de conexión conserva el estado previo y pide reintentar.
 4. Centro de control > Solicitudes muestra los artículos, importes y estado sandbox. Aprobado en pruebas no acredita una venta real, no reserva inventario y no genera despacho. Las notas/revisión siguen separadas del estado de pago.
 
-El monto de prueba corresponde al subtotal de productos; no incluye un flete inventado. No se solicitan datos de envío/contacto en esta fase. Los datos financieros de tarjeta se introducen en Wompi; no llegan a Bacatá.
+El monto de prueba incluye el subtotal y el envío configurado para el destino. Se solicita ciudad/zona; los datos completos de comprador y dirección aún están pendientes. Los datos financieros de tarjeta se introducen en Wompi; no llegan a Bacatá.
 
 ## Verificación y persistencia
 

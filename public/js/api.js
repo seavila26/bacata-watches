@@ -15,7 +15,7 @@ export async function api(path, options = {}) {
   } catch {
     throw Error('Respuesta inválida del servidor');
   }
-  if (!response.ok) throw Object.assign(Error(data.error || `Error ${response.status}`), { status: response.status });
+  if (!response.ok) throw Object.assign(Error(data.error || `Error ${response.status}`), { status: response.status, code: data.code });
   return data;
 }
 export const request = (path, method, body) => api(path, {

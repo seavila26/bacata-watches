@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { quoteDelivery, assertTotal, storeDelivery } from './shipping.js';
 import { quoteItems } from './order-quote.js';
 import { paymentConfig, createCheckout, paymentState, verifyPayment, receiveEvent } from './wompi.js';
 import { requestList, requestDetail, reviewRequest } from './orders.js';
@@ -158,6 +159,12 @@ async function handler(req, res) {
       if (limited(req,res,paymentVerifyLimits,globalPaymentLimit)) return;
       return json(res,200,await receiveEvent(await readJson(req,65536),req.headers['x-event-checksum']));
     }
+    if (path === '/api/shipping/quote' && method === 'POST') {
+      if (!csrf(req,res) || limited(req,res,orderLimits,globalOrderLimit)) return;
+      const data=await readJson(req,16384);
+      const quote=quoteDelivery(data.items,data.destination);
+      return json(res,200,{subtotal_cop:quote.subtotal,shipping_cop:quote.shipping,total_cop:quote.total,destination:quote.destination});
+    }
     if (path === '/api/payments/checkout' && method === 'POST') {
       if (!csrf(req,res) || limited(req,res,orderLimits,globalOrderLimit)) return;
       return json(res,201,createCheckout(await readJson(req,16384),origin));
@@ -180,9 +187,16 @@ async function handler(req, res) {
       if (!csrf(req, res)) return;
       if (limited(req, res, orderLimits, globalOrderLimit)) return;
       const d = await readJson(req, 16384);
-      const { total, items } = quoteItems(d.items);
+      const quote = d.destination ? quoteDelivery(d.items,d.destination) : quoteItems(d.items);
+      if (d.destination) assertTotal(d.expected_total_cop,quote);
+      const {total,items}=quote;
       const id = 'AUR-' + randomBytes(5).toString('hex').toUpperCase();
-      db.prepare('INSERT INTO orders(id,items_json,total_cop,created_at) VALUES(?,?,?,?)').run(id, JSON.stringify(items), total, new Date().toISOString());
+      db.exec('BEGIN IMMEDIATE');
+      try {
+        db.prepare('INSERT INTO orders(id,items_json,total_cop,created_at) VALUES(?,?,?,?)').run(id, JSON.stringify(items), total, new Date().toISOString());
+        if(d.destination) storeDelivery(id,quote);
+        db.exec('COMMIT');
+      } catch(e) {db.exec('ROLLBACK');throw e;}
       audit('customer', 'order_created', id, {
         total
       });
@@ -363,6 +377,7 @@ async function handler(req, res) {
     });
     res.end(data);
   } catch (e) {
+    if(e.code==='quote_changed') return json(res,409,{error:e.message,code:'quote_changed'});
     const status = e.status || (e.code === 'ENOENT' ? 404 : 500);
     console.error('Solicitud fallida:', req.method, (req.url || '').split('?')[0], status);
     if (res.destroyed || res.writableEnded) return;

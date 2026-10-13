@@ -1,4 +1,10 @@
 import { commercialDefaults } from './commercial-model.js';
+function readDestination() {
+  try { const value=JSON.parse(sessionStorage.getItem('bacata-destination') || 'null');
+    if(['bogota','national'].includes(value?.zone) && typeof value.city === 'string' && value.city.length<=100) return value;
+  } catch {}
+  return {zone:'',city:''};
+}
 function readCart() {
   try {
     const data = JSON.parse(localStorage.getItem('aurel-cart') || '{}');
@@ -34,6 +40,7 @@ export const state = {
   admin: null,
   paymentConfig: { enabled:false, mode:'disabled' },
   paymentResult:null,
+  shippingDestination: readDestination(),
   paymentError:'',
   orderList: null,
   selectedOrder: null,

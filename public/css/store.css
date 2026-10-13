@@ -177,3 +177,6 @@
 .art .image-error { color: var(--gray); }
 
 .policy-copy { white-space: pre-line; overflow-wrap: anywhere; }
+
+.checkout-destination { border-block:1px solid var(--line); padding-block:20px; margin-bottom:20px; }
+.checkout-destination .field + .field { margin-top:16px; }

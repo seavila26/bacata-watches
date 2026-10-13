@@ -5,7 +5,9 @@ db.exec(`CREATE TABLE IF NOT EXISTS commercial_profile (
 )`);
 export function commercialProfile() {
   const row = db.prepare('SELECT data_json FROM commercial_profile WHERE id=1').get();
-  return row ? { ...commercialDefaults, ...JSON.parse(row.data_json) } : { ...commercialDefaults };
+  const data = row ? { ...commercialDefaults, ...JSON.parse(row.data_json) } : { ...commercialDefaults };
+  if (data.shipping === 'El costo y las condiciones de envío se confirman antes de la compra. No se anuncia envío gratuito.') data.shipping = commercialDefaults.shipping;
+  return data;
 }
 export function saveCommercial(input, actor) {
   const data = validateCommercial(input);

@@ -1,4 +1,5 @@
 /** Entry point. Routing and events only; templates live in js/views. */
+import { shippingEstimate } from './js/shipping-model.js';
 import { paymentView } from './js/views/payments.js';
 import { state } from './js/state.js';
 import { api, request, normalizeProducts } from './js/api.js';
@@ -174,14 +175,22 @@ function pollPayment(sequence, attempt = 0) {
     render(); pollPayment(sequence, attempt + 1);
   }, 15000);
 }
-function checkoutKey(items) {
+function saveDestination() {
+  try { sessionStorage.setItem('bacata-destination',JSON.stringify(state.shippingDestination)); } catch {}
+}
+function checkoutKey(items, destination, total) {
   const cart = JSON.stringify(items);
+  const context = JSON.stringify({destination,total});
   let existing;
   try { existing = JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null'); } catch {}
-  if (existing?.cart === cart && /^[a-f0-9]{64}$/.test(existing.key)) return existing.key;
+  if (existing?.cart === cart && existing?.context === context && /^[a-f0-9]{64}$/.test(existing.key)) return existing.key;
   const key = [...crypto.getRandomValues(new Uint8Array(32))].map(x=>x.toString(16).padStart(2,'0')).join('');
-  try { sessionStorage.setItem('bacata-checkout',JSON.stringify({cart,key})); } catch {}
+  try { sessionStorage.setItem('bacata-checkout',JSON.stringify({cart,key,context})); } catch {}
   return key;
+}
+async function refreshStorePrices() {
+  const [products,profile]=await Promise.all([api('/api/products'),api('/api/commercial')]);
+  state.products=normalizeProducts(products.products);state.commercial=profile.commercial;
 }
 async function loadOrders() {
   const query = new URLSearchParams(state.orderFilter);
@@ -445,11 +454,17 @@ async function act(button) {
       await refreshPayment(); render(); return;
     case 'pay':
       {
+        if (state.shippingDestination.zone === 'national' && !document.querySelector('#shipping-city')?.reportValidity()) return;
         if (!document.querySelector('#accept-terms')?.checked) throw Error('Lee y acepta las condiciones de prueba para continuar.');
         const items = Object.entries(state.cart).map(([id,quantity])=>({id,quantity}));
+        const destination = { ...state.shippingDestination };
+        const quote = await request('/api/shipping/quote','POST',{items,destination});
+        const estimate = state.products.reduce((sum,p)=>sum + p.price_cop*(state.cart[p.id] || 0),0) + shippingEstimate(destination.zone,state.commercial);
+        if(quote.total_cop !== estimate) { await refreshStorePrices(); render(); toast('El total cambió. Revisa el resumen y acepta de nuevo antes de continuar.'); return; }
         let result;
-        try { result = await request('/api/payments/checkout','POST',{items,accepted:true,idempotency_key:checkoutKey(items)}); }
+        try { result = await request('/api/payments/checkout','POST',{items,accepted:true,destination,expected_total_cop:quote.total_cop,idempotency_key:checkoutKey(items,destination,quote.total_cop)}); }
         catch(error) {
+          if(error.code === 'quote_changed') { await refreshStorePrices(); render(); toast(error.message); return; }
           let previous;
           try { previous = JSON.parse(sessionStorage.getItem('bacata-checkout') || 'null'); } catch {}
           if (error.status === 409 && /^[a-f0-9]{64}$/.test(previous?.token || '')) {
@@ -469,14 +484,16 @@ async function act(button) {
       }
     case 'order':
       {
+        if (state.shippingDestination.zone === 'national' && !document.querySelector('#shipping-city')?.reportValidity()) return;
         if (!document.querySelector('#accept-terms')?.checked) throw Error('Lee y acepta las condiciones de la demostración para continuar.');
         const items = Object.entries(state.cart).map(([id, quantity]) => ({
           id,
           quantity
         }));
-        const result = await request('/api/orders', 'POST', {
-          items
-        });
+        const quote = await request('/api/shipping/quote','POST',{items,destination:state.shippingDestination});
+        const estimate = state.products.reduce((sum,p)=>sum + p.price_cop*(state.cart[p.id] || 0),0) + shippingEstimate(state.shippingDestination.zone,state.commercial);
+        if(quote.total_cop !== estimate) { await refreshStorePrices(); render(); toast('El total cambió. Revisa el resumen antes de continuar.'); return; }
+        const result = await request('/api/orders', 'POST', {items,destination:state.shippingDestination,expected_total_cop:quote.total_cop});
         state.cart = {};
         saveCart();
         main.innerHTML = `<section class="wrap confirmation"><span class="eyebrow">SOLICITUD DE PRUEBA RECIBIDA</span><h1>Gracias por<br>elegir Bacatá.</h1><p>Que esta pieza acompañe tus próximos momentos.</p><div class="panel"><strong>${esc(result.id)}</strong><p>Importe estimado: ${money(result.total_cop)}.</p><p>No se procesó un pago ni se reservó inventario.</p></div><a class="btn" href="#/catalogo">Seguir explorando</a></section>`;
@@ -494,7 +511,7 @@ document.addEventListener('click', async event => {
   if (button.dataset.busy) return;
   button.dataset.busy = 'true';
   const wasDisabled = button.disabled;
-  if (['publication-action', 'order', 'logout', 'commit-import', 'commit-catalog'].includes(button.dataset.action)) button.disabled = true;
+  if (['publication-action', 'pay', 'payment-refresh', 'order', 'logout', 'commit-import', 'commit-catalog'].includes(button.dataset.action)) button.disabled = true;
   try {
     await act(button);
   } catch (error) {
@@ -506,6 +523,8 @@ document.addEventListener('click', async event => {
 });
 document.addEventListener('change', async event => {
   const input = event.target;
+  if (input.id === 'shipping-zone') { state.shippingDestination={zone:input.value,city:input.value==='bogota'?'Bogotá':''};saveDestination();render();document.querySelector('#shipping-city')?.focus();return; }
+  if (input.id === 'shipping-city') {state.shippingDestination.city=input.value;saveDestination();return;}
   if (input.id === 'catalog-sort') {
     state.catalogSort = input.value;
     syncCatalogLocation();
@@ -585,6 +604,7 @@ document.addEventListener('change', async event => {
   }
 });
 document.addEventListener('input', event => {
+  if(event.target.id === 'shipping-city') {state.shippingDestination.city=event.target.value;saveDestination();return;}
   if (event.target.id !== 'search') return;
   const position = event.target.selectionStart;
   state.filters.q = event.target.value;
