@@ -30,7 +30,8 @@ export const state = {
   adminPage: 0,
   products: [],
   admin: null,
-  tab: 'oportunidades',
+  tab: 'resumen',
+  catalogSort: 'selection',
   selected: null,
   filters: {
     q: '',

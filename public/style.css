@@ -1,7 +1,9 @@
-/* Entry point: change global identity in css/tokens.css. */
+/* Identity → semantic themes → components → layouts → responsive → motion. */
 @import url('/css/tokens.css');
+@import url('/css/themes.css');
 @import url('/css/base.css');
 @import url('/css/components.css');
 @import url('/css/store.css');
 @import url('/css/admin.css');
 @import url('/css/responsive.css');
+@import url('/css/motion.css');

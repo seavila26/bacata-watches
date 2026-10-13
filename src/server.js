@@ -1,7 +1,10 @@
 import http from 'node:http';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { resolve, extname } from 'node:path';
-import { randomBytes, scryptSync, timingSafeEqual, createHmac } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { derivePassword, httpError, readBody as body, readJson, decodeBase64, clientAddress, RateLimiter, SessionStore } from './security.js';
+import { WORKBOOK_LIMIT } from './workbook-archive.js';
+import { prepareImage } from './image-upload.js';
 import { db, settings, set, audit, decorate, calculate } from './db.js';
 import { previewInventory, commitInventory } from './inventory-import.js';
 import { editProduct } from './product-editor.js';
@@ -18,9 +21,25 @@ if (!email || !password || !secret || password.length < 16 || secret.length < 32
   console.error('Configura ADMIN_EMAIL, ADMIN_PASSWORD (>=16) y SESSION_SECRET (>=32).');
   process.exit(1);
 }
-const hash = s => createHmac('sha256', secret).update(s).digest('hex');
-const digest = scryptSync(password, 'aurel-admin-v1', 64),
-  sessions = new Map();
+const trustProxy = process.env.TRUST_PROXY === 'loopback';
+if (process.env.TRUST_PROXY && !['loopback', 'none'].includes(process.env.TRUST_PROXY)) throw Error('TRUST_PROXY debe ser loopback o none');
+const digest = scryptSync(password, 'aurel-admin-v1', 64), sessions = new SessionStore(secret);
+const loginLimits = new RateLimiter({ limit: 10, windowMs: 15 * 60000 });
+const globalLoginLimit = new RateLimiter({ limit: 60, windowMs: 60000 });
+const orderLimits = new RateLimiter({ limit: 20, windowMs: 10 * 60000 });
+const globalOrderLimit = new RateLimiter({ limit: 120, windowMs: 60000 });
+let loginWorkers = 0;
+function limited(req, res, perAddress, global) {
+  const result = perAddress.consume(clientAddress(req, trustProxy));
+  const globalResult = result.allowed ? global.consume('all') : result;
+  if (result.allowed && globalResult.allowed) return false;
+  res.setHeader('Retry-After', String(globalResult.retryAfter));
+  const wait = globalResult.retryAfter >= 60 ? `${Math.ceil(globalResult.retryAfter / 60)} minuto(s)` : `${globalResult.retryAfter} segundo(s)`;
+  error(res, 429, `Demasiados intentos. Vuelve a intentarlo en ${wait}.`); return true;
+}
+const sweepSessions = setInterval(() => sessions.sweep(), 60000); sweepSessions.unref();
+const cookie = (token, maxAge) => `aurel_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}${origin.startsWith('https:') ? '; Secure' : ''}`;
+const validationMessage = e => e.status || (e.constructor === Error && !e.code) ? e.message : 'No se pudo procesar la solicitud';
 function json(res, status, data) {
   res.writeHead(status, {
     'content-type': 'application/json; charset=utf-8',
@@ -33,30 +52,7 @@ function error(res, status, message) {
     error: message
   });
 }
-async function body(req, max = 1024 * 1024) {
-  let raw = '';
-  for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > max) throw Object.assign(new Error('Archivo demasiado grande'), {
-      status: 413
-    });
-  }
-  return raw;
-}
-function auth(req) {
-  const token = (req.headers.cookie || '').split(';').map(x => x.trim()).find(x => x.startsWith('aurel_session='))?.split('=')[1];
-  if (!token) return false;
-  const [id, sig] = token.split('.');
-  if (!id || !sig || sig.length !== 64) return false;
-  const expected = hash(id);
-  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
-  const until = sessions.get(id);
-  if (!until || until < Date.now()) {
-    sessions.delete(id);
-    return false;
-  }
-  return true;
-}
+function auth(req) { return sessions.authenticate(req); }
 function guard(req, res) {
   if (!auth(req)) {
     error(res, 401, 'Inicia sesión como administrador');
@@ -66,7 +62,7 @@ function guard(req, res) {
 }
 function csrf(req, res) {
   const u = req.headers.origin;
-  if (u && u !== origin) {
+  if ((u && u !== origin) || req.headers['sec-fetch-site'] === 'cross-site') {
     error(res, 403, 'Origen no permitido');
     return false;
   }
@@ -112,32 +108,43 @@ const mime = {
   '.jpeg': 'image/jpeg',
   '.woff': 'font/woff'
 };
+async function workbookBody(req) {
+  if (req.headers['content-type']?.split(';')[0].trim().toLowerCase() !== 'application/octet-stream') throw httpError(415, 'La carga requiere un archivo XLSX');
+  return decodeBase64(await body(req, 4 * Math.ceil(WORKBOOK_LIMIT / 3)), WORKBOOK_LIMIT);
+}
 async function handler(req, res) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  if (origin.startsWith('https:')) res.setHeader('Strict-Transport-Security', 'max-age=15552000');
   try {
     const u = new URL(req.url, origin),
       path = u.pathname,
       method = req.method;
     if (path === '/api/admin/login' && method === 'POST') {
       if (!csrf(req, res)) return;
-      const data = JSON.parse(await body(req));
-      const submitted = scryptSync(String(data.password || ''), 'aurel-admin-v1', 64);
-      if (clean(data.email).toLowerCase() !== email.toLowerCase() || !timingSafeEqual(digest, submitted)) return error(res, 401, 'Credenciales incorrectas');
-      const id = randomBytes(32).toString('hex');
-      sessions.set(id, Date.now() + 8 * 3600000);
-      res.setHeader('Set-Cookie', `aurel_session=${id}.${hash(id)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=28800${origin.startsWith('https:') ? '; Secure' : ''}`);
+      if (limited(req, res, loginLimits, globalLoginLimit)) return;
+      if (loginWorkers >= 2) { res.setHeader('Retry-After', '3'); return error(res, 429, 'Verificación en curso. Espera unos segundos.'); }
+      const data = await readJson(req, 8192);
+      if (typeof data.email !== 'string' || data.email.length > 320 || typeof data.password !== 'string' || Buffer.byteLength(data.password) > 1024) return error(res, 401, 'Credenciales incorrectas');
+      loginWorkers++;
+      let submitted;
+      try { submitted = await derivePassword(data.password, 'aurel-admin-v1', 64); } finally { loginWorkers--; }
+      if (!timingSafeEqual(digest, submitted) || clean(data.email).toLowerCase() !== email.toLowerCase()) return error(res, 401, 'Credenciales incorrectas');
+      loginLimits.reset(clientAddress(req, trustProxy));
+      res.setHeader('Set-Cookie', cookie(sessions.create(req), 28800));
       return json(res, 200, {
         ok: true
       });
     }
     if (path === '/api/admin/logout' && method === 'POST') {
       if (!csrf(req, res)) return;
-      sessions.delete((req.headers.cookie || '').match(/aurel_session=([a-f0-9]{64})/)?.[1]);
-      res.setHeader('Set-Cookie', 'aurel_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0');
+      sessions.revoke(req);
+      res.setHeader('Set-Cookie', cookie('', 0));
       return json(res, 200, {
         ok: true
       });
     }
-    if (path === '/api/admin/session') return json(res, 200, {
+    if (path === '/api/admin/session' && method === 'GET') return json(res, 200, {
       authenticated: auth(req)
     });
     if (path === '/api/products' && method === 'GET') {
@@ -148,11 +155,13 @@ async function handler(req, res) {
     }
     if (path === '/api/orders' && method === 'POST') {
       if (!csrf(req, res)) return;
-      const d = JSON.parse(await body(req));
+      if (limited(req, res, orderLimits, globalOrderLimit)) return;
+      const d = await readJson(req, 16384);
       if (!Array.isArray(d.items) || d.items.length < 1 || d.items.length > 20) return error(res, 400, 'Carrito inválido');
       let total = 0;
       const items = [];
       for (const item of d.items) {
+        if (!item || typeof item.id !== 'string' || item.id.length > 200) return error(res, 400, 'Carrito inválido');
         const quantity = +item.quantity;
         if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) return error(res, 400, 'Cantidad inválida');
         const p = db.prepare("SELECT * FROM products WHERE id=? AND status='published'").get(item.id);
@@ -183,7 +192,7 @@ async function handler(req, res) {
     if (path.startsWith('/api/admin/')) {
       if (!guard(req, res)) return;
       if (method !== 'GET' && !csrf(req, res)) return;
-      if (path === '/api/admin/overview') {
+      if (path === '/api/admin/overview' && method === 'GET') {
         const rows = db.prepare('SELECT * FROM products ORDER BY updated_at DESC').all().map(p => decorate(p));
         const jobs = db.prepare('SELECT * FROM jobs ORDER BY id DESC LIMIT 10').all();
         return json(res, 200, {
@@ -195,8 +204,8 @@ async function handler(req, res) {
         });
       }
       if (path === '/api/admin/settings' && method === 'PUT') {
-        const d = JSON.parse(await body(req));
-        validSettings(d);
+        const d = await readJson(req);
+        try { validSettings(d); } catch (error) { throw httpError(400, validationMessage(error)); }
         const prev = settings();
         const prices = new Map(db.prepare('SELECT * FROM products').all().map(p => [p.id, calculate(p).price]));
         db.exec('BEGIN IMMEDIATE');
@@ -223,24 +232,27 @@ async function handler(req, res) {
           settings: settings()
         });
       }
-      if (path === '/api/admin/catalog/export' && method === 'POST') return xlsx(res, await exportCatalog(JSON.parse(await body(req)), email), 'plantilla-fichas.xlsx');
-      if (path === '/api/admin/catalog/preview' && method === 'POST') return json(res, 200, await previewCatalog(Buffer.from(await body(req, 24 * 1024 * 1024), 'base64'), email));
+      if (path === '/api/admin/catalog/export' && method === 'POST') return xlsx(res, await exportCatalog(await readJson(req), email), 'plantilla-fichas.xlsx');
+      if (path === '/api/admin/catalog/preview' && method === 'POST') {
+        try { return json(res, 200, await previewCatalog(await workbookBody(req), email)); }
+        catch (e) { return error(res, e.status || 400, validationMessage(e)); }
+      }
       if (path === '/api/admin/catalog/commit' && method === 'POST') {
         try {
-          return json(res, 200, commitCatalog(JSON.parse(await body(req)).token, email));
+          return json(res, 200, commitCatalog((await readJson(req)).token, email));
         } catch (e) {
-          return error(res, 409, e.message);
+          return error(res, e.status || 409, validationMessage(e));
         }
       }
-      if (path === '/api/admin/catalog/pending' && method === 'POST') return xlsx(res, await exportPending(JSON.parse(await body(req)).token, email), 'pendientes-fichas.xlsx');
+      if (path === '/api/admin/catalog/pending' && method === 'POST') return xlsx(res, await exportPending((await readJson(req)).token, email), 'pendientes-fichas.xlsx');
       if (path === '/api/admin/publications/action' && method === 'POST') {
-        const d = JSON.parse(await body(req));
+        const d = await readJson(req);
         return json(res, 200, publicationAction(d.ids, d.action, email));
       }
       if (path === '/api/admin/publications/export' && method === 'POST') {
         const {
           ids
-        } = JSON.parse(await body(req));
+        } = await readJson(req);
         if (!Array.isArray(ids) || ids.length > 10000) throw Error('Selección inválida');
         const rows = ids.map(id => {
           const raw = db.prepare('SELECT * FROM products WHERE id=?').get(id);
@@ -270,15 +282,15 @@ async function handler(req, res) {
       if (edit && method === 'PATCH') {
         try {
           return json(res, 200, {
-            product: editProduct(decodeURIComponent(edit[1]), JSON.parse(await body(req)), email)
+            product: editProduct(decodeURIComponent(edit[1]), await readJson(req), email)
           });
         } catch (e) {
-          return error(res, 400, e.message);
+          return error(res, e.status || 400, validationMessage(e));
         }
       }
       const status = path.match(/^\/api\/admin\/products\/([^/]+)\/status$/);
       if (status && method === 'PATCH') {
-        const d = JSON.parse(await body(req));
+        const d = await readJson(req);
         if (!['paused', 'published'].includes(d.status)) return error(res, 400, 'Estado inválido');
         const result = publicationAction([decodeURIComponent(status[1])], d.status === 'paused' ? 'pause' : 'reactivate', email);
         if (!result.results[0].ok) return json(res, 409, {
@@ -287,34 +299,32 @@ async function handler(req, res) {
         return json(res, 200, result);
       }
       if (path === '/api/admin/inventory/preview' && method === 'POST') {
-        const file = await body(req, 24 * 1024 * 1024);
+        const file = await workbookBody(req);
         try {
-          return json(res, 200, await previewInventory(Buffer.from(file, 'base64'), email));
+          return json(res, 200, await previewInventory(file, email));
         } catch (e) {
-          return error(res, 400, e.message);
+          return error(res, e.status || 400, validationMessage(e));
         }
       }
       if (path === '/api/admin/inventory/commit' && method === 'POST') {
-        const d = JSON.parse(await body(req));
+        const d = await readJson(req);
         try {
           return json(res, 200, commitInventory(d.token, d.selection, email));
         } catch (e) {
-          return error(res, 409, e.message);
+          return error(res, e.status || 409, validationMessage(e));
         }
       }
       if (path === '/api/admin/images' && method === 'POST') {
-        const d = JSON.parse(await body(req, 8 * 1024 * 1024)),
-          bytes = Buffer.from(String(d.base64 || ''), 'base64');
-        if (!bytes.length || bytes.length > 5 * 1024 * 1024) return error(res, 400, 'Imagen de máximo 5 MB');
-        const png = bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
-        const jpg = bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255;
-        const webp = bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
-        if (!png && !jpg && !webp) return error(res, 400, 'Solo fotografías PNG, JPEG o WebP');
-        const filename = randomBytes(16).toString('hex') + (png ? '.png' : jpg ? '.jpg' : '.webp');
+        const d = await readJson(req, 7 * 1024 * 1024);
+        const input = decodeBase64(d.base64, 5 * 1024 * 1024);
+        const bytes = await prepareImage(input);
+        const filename = randomBytes(16).toString('hex') + '.webp';
         await mkdir('public/uploads', {
+          mode: 0o700,
           recursive: true
         });
         await writeFile(resolve('public/uploads', filename), bytes, {
+          mode: 0o600,
           flag: 'wx'
         });
         audit(email, 'image_uploaded', filename, {
@@ -338,12 +348,17 @@ async function handler(req, res) {
     });
     res.end(data);
   } catch (e) {
-    console.error(e);
-    error(res, e.status || 400, e.status ? e.message : 'Solicitud inválida o error de integración');
+    const status = e.status || (e.code === 'ENOENT' ? 404 : 500);
+    console.error('Solicitud fallida:', req.method, (req.url || '').split('?')[0], status);
+    if (res.destroyed || res.writableEnded) return;
+    if (status === 429 && !res.hasHeader('Retry-After')) res.setHeader('Retry-After', '3');
+    error(res, status, e.status ? e.message : status === 404 ? 'No encontrado' : 'No se pudo procesar la solicitud');
   }
 }
 // Align inherited publication flags with the same requirements used by the store.
 db.exec('BEGIN IMMEDIATE');
 try { reconcileAll('system'); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
 const server = http.createServer(handler);
-server.listen(PORT, () => console.log(`Bacatá disponible en http://localhost:${server.address().port}`));
+server.requestTimeout = 60000;
+server.headersTimeout = 15000;
+server.listen(PORT, process.env.HOST || '127.0.0.1', () => console.log(`Bacatá disponible en http://localhost:${server.address().port}`));

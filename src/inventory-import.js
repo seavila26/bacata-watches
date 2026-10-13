@@ -1,4 +1,4 @@
-import ExcelJS from 'exceljs';
+import { readWorkbook } from './workbook-reader.js';
 import { randomUUID } from 'node:crypto';
 import { db, audit, settings, calculate } from './db.js';
 import { identityKey, sourceFinance, normalizeIdentity } from './catalog-model.js';
@@ -42,8 +42,7 @@ function readAssumptions(sheet) {
   return a;
 }
 export async function parseInventory(buffer) {
-  const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  const workbook = await readWorkbook(buffer);
   const assumptions = readAssumptions(workbook.getWorksheet('Supuestos'));
   const globalSettings = settings();
   const layouts = [['Base comparada', {

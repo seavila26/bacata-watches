@@ -1,0 +1,39 @@
+/* Semantic colors. Original brand colors and logo artwork never change. */
+:root {
+  color-scheme: light;
+  --ink: var(--blue); --page-bg: var(--white); --surface: var(--white);
+  --surface-soft: var(--ivory); --operational-bg: #F2F4F8;
+  --input-line: #9198A2; --border-soft: #E7E0D4;
+  --hover-surface: #EEF2F7; --disabled-bg: #EDF1F6; --art-bg: var(--ivory);
+  --action-bg: var(--blue); --action-border: var(--blue); --action-hover: #17345C;
+  --success-bg: #EFF8F0; --error-bg: #FFF3F2; --warning-bg: #FFF8E9;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink: #EDF2FA; --text: #EDF2FA; --muted: #B3BECE;
+  --page-bg: #0A1626; --surface: #101F32; --surface-soft: #14263D;
+  --operational-bg: #0B1727; --line: #33465D; --border-soft: #33465D;
+  --input-line: #60748B; --hover-surface: #1B314A; --disabled-bg: #1B2A3D;
+  --action-bg: #17345C; --action-border: #47678E; --action-hover: #244775;
+  --success: #9FD3B8; --error: #FFB5B0; --warning: #E8CE97;
+  --good: var(--success); --bad: var(--error);
+  --success-bg: #133329; --error-bg: #3F222A; --warning-bg: #382E1C;
+  --shadow: 0 16px 48px rgb(0 0 0 / 20%);
+}
+.theme-toggle .theme-sun { display: none; }
+[data-theme="dark"] .theme-toggle .theme-moon { display: none; }
+[data-theme="dark"] .theme-toggle .theme-sun { display: block; }
+/* A white backing preserves the actual, approved logo colors in dark mode. */
+[data-theme="dark"] .logo img, [data-theme="dark"] .brand-story__mark img {
+  background: #FFF; border-radius: 6px; padding: 8px;
+}
+[data-theme="dark"] ::selection { background: #355174; color: #FFF; }
+[data-theme="dark"] :focus-visible { outline-color: #91B6F0; }
+[data-theme="dark"] .skeleton { background-image: linear-gradient(90deg,#14263D,#1B314A,#14263D); }
+
+[data-theme="dark"] .campaign--christmas, [data-theme="dark"] .campaign--friendship, [data-theme="dark"] .campaign--black-friday { background: var(--surface-soft); }
+[data-theme="dark"] .campaign--christmas .hero__content h1, [data-theme="dark"] .campaign--friendship .hero__content h1 { color: var(--ink); }
+[data-theme="dark"] .header-action:hover { color: #D9E2F0; }
+
+/* Keep the compact header logo backing proportional; footer artwork is unchanged. */
+[data-theme="dark"] .site-header .logo img { padding: 4px; }
